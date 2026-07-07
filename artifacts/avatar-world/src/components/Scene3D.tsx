@@ -20,6 +20,14 @@ interface Scene3DProps {
   onSelectAgent: (agent: Agent) => void;
 }
 
+// Resolve a door agentId → Agent object from the live agents array
+function makeDoorClickHandler(agents: Agent[], onSelectAgent: (a: Agent) => void) {
+  return (agentId: string) => {
+    const agent = agents.find((a) => a.id === agentId);
+    if (agent) onSelectAgent(agent);
+  };
+}
+
 interface CameraRigProps {
   pagedAgent: Agent | null;
   controlsRef: React.MutableRefObject<any>;
@@ -68,9 +76,10 @@ function CameraRig({ pagedAgent, controlsRef }: CameraRigProps) {
 function SceneContent({
   agents, selectedAgent, speakingAgentId, pagedAgentId, specialtyFilter, onSelectAgent,
 }: Scene3DProps) {
+  const onDoorClick = makeDoorClickHandler(agents, onSelectAgent);
   return (
     <>
-      <Environment3D />
+      <Environment3D onDoorClick={onDoorClick} />
       <FloatingProps />
       {agents.map((agent) => (
         <AvatarAgent

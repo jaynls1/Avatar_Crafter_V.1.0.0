@@ -1,6 +1,7 @@
 import { useRef, useMemo } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
+import { Hallways } from "./Hallways";
 
 // ─── Seeded random ─────────────────────────────────────────────────────────────
 function sr(seed: number) {
@@ -88,24 +89,30 @@ function MainFloor() {
 }
 
 // ─── Walls ────────────────────────────────────────────────────────────────────
+// Left wall has an opening at z = -3 → -7 (4 units wide) for the Strategy Wing hallway.
 function Walls() {
   const wallColor = "#13100c";
   const panelColor = "#1a1510";
   const accentColor = "#F97316";
   return (
     <group>
-      {/* Left wall */}
-      <mesh position={[-13.2, 4, -6]}>
-        <boxGeometry args={[0.25, 12, 18]} />
+      {/* Left wall — FRONT section (z from +3 to -3, length 6) */}
+      <mesh position={[-13.2, 4, 0]}>
+        <boxGeometry args={[0.25, 12, 6]} />
         <meshStandardMaterial color={wallColor} roughness={0.88} />
       </mesh>
-      {/* Right wall */}
+      {/* Left wall — BACK section (z from -7 to -15, length 8, center at -11) */}
+      <mesh position={[-13.2, 4, -11]}>
+        <boxGeometry args={[0.25, 12, 8]} />
+        <meshStandardMaterial color={wallColor} roughness={0.88} />
+      </mesh>
+      {/* Right wall — full */}
       <mesh position={[13.2, 4, -6]}>
         <boxGeometry args={[0.25, 12, 18]} />
         <meshStandardMaterial color={wallColor} roughness={0.88} />
       </mesh>
-      {/* Left wall dado rail panels */}
-      {[-2, -5, -8, -11].map((z, i) => (
+      {/* Left wall dado rail panels — skip z=-5 (inside hallway opening) */}
+      {[-2, -8, -11].map((z, i) => (
         <mesh key={i} position={[-12.9, 0.8, z]}>
           <boxGeometry args={[0.08, 2.2, 2.4]} />
           <meshStandardMaterial color={panelColor} roughness={0.75} metalness={0.2} />
@@ -118,9 +125,14 @@ function Walls() {
           <meshStandardMaterial color={panelColor} roughness={0.75} metalness={0.2} />
         </mesh>
       ))}
-      {/* Left wall orange accent strip */}
-      <mesh position={[-13.1, -0.1, -6]}>
-        <boxGeometry args={[0.06, 0.06, 18]} />
+      {/* Left wall accent strip — FRONT (center at 0, length 6) */}
+      <mesh position={[-13.1, -0.1, 0]}>
+        <boxGeometry args={[0.06, 0.06, 6]} />
+        <meshBasicMaterial color={accentColor} transparent opacity={0.45} />
+      </mesh>
+      {/* Left wall accent strip — BACK (center at -11, length 8) */}
+      <mesh position={[-13.1, -0.1, -11]}>
+        <boxGeometry args={[0.06, 0.06, 8]} />
         <meshBasicMaterial color={accentColor} transparent opacity={0.45} />
       </mesh>
       {/* Right wall orange accent strip */}
@@ -579,7 +591,7 @@ function SkyBack() {
 }
 
 // ─── Main Environment ──────────────────────────────────────────────────────────
-export function Environment3D() {
+export function Environment3D({ onDoorClick }: { onDoorClick?: (agentId: string) => void } = {}) {
   return (
     <>
       <fog attach="fog" args={["#0d0a08", 35, 120]} />
@@ -665,6 +677,9 @@ export function Environment3D() {
       <CityBuilding position={[38,  5,  -53]} w={10} h={22} d={7}  seed={5} />
 
       <SkyBack />
+
+      {/* Hallway wings */}
+      {onDoorClick && <Hallways onDoorClick={onDoorClick} />}
     </>
   );
 }

@@ -4,54 +4,16 @@ import { Text, Billboard, Circle, Ring, RoundedBox, useTexture } from "@react-th
 import * as THREE from "three";
 import { Agent } from "../agents";
 
-import anchorIdle   from "@assets/agents/anchor/idle.png";
-import anchorSpeak  from "@assets/agents/anchor/speak.png";
-import anchorActive from "@assets/agents/anchor/active.png";
-import atlasIdle    from "@assets/agents/atlas/idle.png";
-import atlasSpeak   from "@assets/agents/atlas/speak.png";
-import atlasActive  from "@assets/agents/atlas/active.png";
-import havenIdle    from "@assets/agents/haven/idle.png";
-import havenSpeak   from "@assets/agents/haven/speak.png";
-import havenActive  from "@assets/agents/haven/active.png";
-import igniteIdle   from "@assets/agents/ignite/idle.png";
-import igniteSpeak  from "@assets/agents/ignite/speak.png";
-import igniteActive from "@assets/agents/ignite/active.png";
-import indexIdle    from "@assets/agents/index/idle.png";
-import indexSpeak   from "@assets/agents/index/speak.png";
-import indexActive  from "@assets/agents/index/active.png";
-import legionIdle   from "@assets/agents/legion/idle.png";
-import legionSpeak  from "@assets/agents/legion/speak.png";
-import legionActive from "@assets/agents/legion/active.png";
-import memeIdle     from "@assets/agents/meme/idle.png";
-import memeSpeak    from "@assets/agents/meme/speak.png";
-import memeActive   from "@assets/agents/meme/active.png";
-import novaIdle     from "@assets/agents/nova/idle.png";
-import novaSpeak    from "@assets/agents/nova/speak.png";
-import novaActive   from "@assets/agents/nova/active.png";
-import rookIdle     from "@assets/agents/rook/idle.png";
-import rookSpeak    from "@assets/agents/rook/speak.png";
-import rookActive   from "@assets/agents/rook/active.png";
-import scribeIdle   from "@assets/agents/scribe/idle.png";
-import scribeSpeak  from "@assets/agents/scribe/speak.png";
-import scribeActive from "@assets/agents/scribe/active.png";
-import sniperIdle   from "@assets/agents/sniper/idle.png";
-import sniperSpeak  from "@assets/agents/sniper/speak.png";
-import sniperActive from "@assets/agents/sniper/active.png";
+// ─── Sprite map ────────────────────────────────────────────────────────────────
+// Populated when agent sprite images are present in attached_assets/agents/<id>/.
+// Empty by default; agents fall back to the geometric robot when no entry exists.
+// To restore sprites: add idle/speak/active PNGs to attached_assets/agents/<id>/
+// and re-add the import + entry here.
 
 interface SpritePoses { idle: string; speak: string; active: string; }
 
 const SPRITE_MAP: Record<string, SpritePoses> = {
-  anchor: { idle: anchorIdle, speak: anchorSpeak, active: anchorActive },
-  atlas:  { idle: atlasIdle,  speak: atlasSpeak,  active: atlasActive  },
-  haven:  { idle: havenIdle,  speak: havenSpeak,  active: havenActive  },
-  ignite: { idle: igniteIdle, speak: igniteSpeak, active: igniteActive },
-  index:  { idle: indexIdle,  speak: indexSpeak,  active: indexActive  },
-  legion: { idle: legionIdle, speak: legionSpeak, active: legionActive },
-  meme:   { idle: memeIdle,   speak: memeSpeak,   active: memeActive   },
-  nova:   { idle: novaIdle,   speak: novaSpeak,   active: novaActive   },
-  rook:   { idle: rookIdle,   speak: rookSpeak,   active: rookActive   },
-  scribe: { idle: scribeIdle, speak: scribeSpeak, active: scribeActive },
-  sniper: { idle: sniperIdle, speak: sniperSpeak, active: sniperActive },
+  // Sprites will be re-added here once the PNG assets are uploaded.
 };
 
 const STAGE_POSITION = new THREE.Vector3(0, 0, 1.5);
