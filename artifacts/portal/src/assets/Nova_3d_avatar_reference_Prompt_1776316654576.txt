@@ -1,0 +1,43 @@
+NOVA 3D Character Dataset Reference Prompt
+Scene Description:
+A clean, professional, dark-field composite data-sheet presented against a deep black background, optimized for 3D character creation. The entire composite is organized into four clearly labeled sections with white, capitalized text titles. The lighting is studio-quality, creating depth and photorealistic textures. All sections are displayed horizontally.
+
+Section 1: "BODY REFERENCE PANELS" (Top Section)
+Four full-body, high-resolution views of a young woman with short brown hair, wearing a black t-shirt, blue denim jeans, a brown leather belt, and sneakers, in a neutral standing pose.
+
+Views (Side-by-side): Direct Front, Direct Back, Left Profile, and Right Profile.
+
+Section 2: "FACIAL REFERENCE PANELS" (Second Section)
+Three high-definition close-up portraits of the same woman, each displaying a different, distinct expression.
+
+Expression 1: Wide, open-mouthed smile with visible teeth, beaming and expressive.
+
+Expression 2: Wide-eyed, open-mouthed expression of surprise or realization.
+
+Expression 3: Calm, neutral, forward-looking closed-mouth expression.
+
+Section 3: "TEXTURE REFERENCE PANELS" (Third Section)
+Four extremely sharp, macro close-ups detailing specific surface textures of the character.
+
+Panel 1: Close-up of cheek skin texture, detailing pores and subtle variation.
+
+Panel 2: Close-up of the black t-shirt fabric, detailing the weave.
+
+Panel 3: Close-up of the denim fabric, detailing the stitching, denim grain, and a metal zipper pull.
+
+Panel 4: Close-up of the brown leather belt and its detailed metal buckle.
+
+Section 4: "ANATOMICAL GUIDE" (Bottom Section)
+A full-body human skeletal model (a 3D skeleton) in a standard anatomical pose against the dark void. The skeletal structure features numerous prominent red spherical markers placed at critical joint points, specifically indicating:
+
+The neck (base of skull and C-spine)
+
+The shoulders, elbows, and wrists
+
+The hips and knees
+
+Final Text Block (Bottom-Right Corner)
+A block of sharp, legible white text reads verbatim:
+"FULL DATA SET REQUIRED: 1. Body Photogrammetry, 2. FACS (Expressions) & Visemes, 4. Joint Rigging and Skin Weighting Data." (Note: preserve the 1, 2, 4 numbering exactly.)
+
+You can use this prompt with any high-quality image generation system that supports multi-stage composite generation to produce a self-contained reference image for your project. Here is the visual representation of that dataset.
