@@ -55,8 +55,9 @@ Every package extends `tsconfig.base.json` which sets `composite: true`. The roo
 Express 5 API server. Routes live in `src/routes/` and use `@workspace/api-zod` for request and response validation and `@workspace/db` for persistence.
 
 - Entry: `src/index.ts` — reads `PORT`, starts Express
-- App setup: `src/app.ts` — mounts CORS, JSON/urlencoded parsing, routes at `/api`
-- Routes: `src/routes/index.ts` mounts sub-routers; `src/routes/health.ts` exposes `GET /health` (full path: `/api/health`)
+- App setup: `src/app.ts` — mounts CORS (credentials), cookie-parser, JSON/urlencoded parsing, authMiddleware, routes at `/api`
+- Routes: `src/routes/index.ts` mounts sub-routers; `src/routes/health.ts` exposes `GET /health`; `src/routes/auth.ts` exposes OIDC login/callback/logout and mobile token exchange
+- Auth: `src/lib/auth.ts` (session management, OIDC config), `src/middlewares/authMiddleware.ts` (loads user from session on every request)
 - Depends on: `@workspace/db`, `@workspace/api-zod`
 - `pnpm --filter @workspace/api-server run dev` — run the dev server
 - `pnpm --filter @workspace/api-server run build` — production esbuild bundle (`dist/index.cjs`)
@@ -91,6 +92,42 @@ Generated Zod schemas from the OpenAPI spec (e.g. `HealthCheckResponse`). Used b
 
 Generated React Query hooks and fetch client from the OpenAPI spec (e.g. `useHealthCheck`, `healthCheck`).
 
+### `lib/replit-auth-web` (`@workspace/replit-auth-web`)
+
+Browser auth package for Replit Auth (OIDC). Exports `useAuth()` hook with `{ user, isAuthenticated, isLoading, login, logout }`. Used in `artifacts/avatar-world`. Do **not** use generated API client code for auth — always use this package.
+
 ### `scripts` (`@workspace/scripts`)
 
 Utility scripts package. Each script is a `.ts` file in `src/` with a corresponding npm script in `package.json`. Run scripts via `pnpm --filter @workspace/scripts run <script>`. Scripts can import any workspace package (e.g., `@workspace/db`) by adding it as a dependency in `scripts/package.json`.
+
+## NEXT Agent Registry
+
+The 12 NEXT agents are defined in two files that must stay in sync:
+- **`artifacts/avatar-world/src/agents.ts`** — frontend definitions (id, name, title, color, position, greeting)
+- **`artifacts/api-server/src/lib/agentPersonalities.ts`** — backend system prompts (used by OpenAI to respond in-character)
+
+Agent IDs must match between both files. Current agents:
+
+| ID | Name | Role |
+|---|---|---|
+| `atlas` | Atlas | Strategic Command Intelligence |
+| `nova` | Nova | Systems Engineer & Infrastructure Architect |
+| `rook` | Rook | Security Sentinel & Integrity Guardian |
+| `sniper` | Sniper | Sales & Customer Engagement Specialist |
+| `meme` | Meme | Social Media & Community Manager |
+| `anchor` | Anchor | Interface Architect & Experience Designer |
+| `ignite` | Ignite (Iggy) | Innovation Catalyst |
+| `haven` | Haven | Readiness Guardian |
+| `index` | Index (Indy) | Knowledge Librarian |
+| `scribe` | Scribe | Documentation & Knowledge Architect |
+| `legion` | Legion | Legal & Policy Expert |
+| `gemini` | Gemini | Motion & Continuity Engine |
+
+## OpenAI Chat API (SSE Streaming)
+
+Routes in `artifacts/api-server/src/routes/openai/index.ts`:
+- `POST /api/openai/conversations` — create a conversation `{ title, agentId }`
+- `GET /api/openai/conversations/:id` — fetch conversation + messages
+- `POST /api/openai/conversations/:id/messages` — send user message, streams back agent response via SSE
+
+Frontend consumes SSE using `fetch + ReadableStream` (NOT EventSource — it doesn't support POST). Model: `gpt-5.2`, `max_completion_tokens: 8192`.
