@@ -1,0 +1,59 @@
+# Back Office Admin Panel Spec
+
+## Context
+The 3D world is the public stage. The Back Office needs to become mission control where Jason can monitor agent activity and communicate with agents directly.
+
+Integration loop: ClickUp → 3D World (Replit) → Notion → WordPress
+
+## 1. Monitor (Read Layer)
+
+### Activity Feed
+- Real-time stream of agent conversations, task pickups, completions
+- SSE or WebSocket from api-server to Back Office frontend
+
+### Per-Agent Status Cards
+- Current state: idle, in-conversation, working-on-task
+- Last active timestamp
+- Current ClickUp task (once ClickUp integration is wired)
+- Conversation count (today / total)
+
+### System Health
+- API latency, error rates
+- OpenAI token usage
+- Active sessions count
+
+## 2. Communicate (Write Layer)
+
+### Admin Chat
+- DM any agent directly from Back Office
+- Admin messages get elevated context in system prompt (role: admin flag)
+- Bypasses public-facing prompt constraints
+- Separate conversation thread from public users
+
+### Broadcast
+- Push instructions to all agents simultaneously
+- Use cases: "pause all external conversations", "prioritize task X", "update your greeting"
+
+### Prompt Hot-Swap
+- Edit system prompts live in the Back Office UI
+- Changes take effect immediately (bypass the 1-hour cache TTL)
+- Version history so you can rollback
+
+## 3. Architecture
+
+### What to Add
+- WebSocket/SSE endpoint on api-server: streams conversation events to Back Office
+- Admin auth middleware: elevated role check on existing auth
+- Admin chat route: POST /api/admin/conversations/:agentId/messages
+- Broadcast route: POST /api/admin/broadcast
+- Prompt management routes: CRUD on agent system prompts with instant cache invalidation
+
+### Database Additions
+- admin_messages table (or flag on existing messages table)
+- prompt_versions table (agent_id, content, created_at, active boolean)
+
+## 4. Build Order
+1. Admin chat (talk to agents with elevated permissions)
+2. Activity feed (see what's happening)
+3. Prompt hot-swap (control without redeploying)
+4. Status cards + health dashboard (polish)
