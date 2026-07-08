@@ -85,7 +85,7 @@ function getNovaReply(input: string): string {
   return "We're still building NEXT, but I'm here for questions. What would you like to know?";
 }
 
-function PortalDoor({ onEnter }: { onEnter: () => void }) {
+function PortalDoor({ onEnter, onBackOffice }: { onEnter: () => void; onBackOffice: () => void }) {
   // Door geometry constants — corridor walls converge on these
   const DW = 220, DH = 364;
 
@@ -388,13 +388,33 @@ function PortalDoor({ onEnter }: { onEnter: () => void }) {
           <span style={{ color: "white", fontWeight: 700, fontSize: 15 }}>NEXT</span>
           <span style={{ color: "rgba(255,255,255,0.25)", fontSize: 13 }}>Level Solutions</span>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <span style={{
-            display: "inline-block", width: 7, height: 7, borderRadius: "50%",
-            background: O, boxShadow: `0 0 8px ${O}`,
-            animation: "blink 1.8s ease-in-out infinite",
-          }} />
-          <span style={{ color: O, fontSize: 11, fontWeight: 600, letterSpacing: 1.5 }}>NOVA ONLINE</span>
+        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <span style={{
+              display: "inline-block", width: 7, height: 7, borderRadius: "50%",
+              background: O, boxShadow: `0 0 8px ${O}`,
+              animation: "blink 1.8s ease-in-out infinite",
+            }} />
+            <span style={{ color: O, fontSize: 11, fontWeight: 600, letterSpacing: 1.5 }}>NOVA ONLINE</span>
+          </div>
+          <button
+            onClick={onBackOffice}
+            title="Mission Control"
+            style={{
+              background: `linear-gradient(135deg, rgba(249,115,22,0.18), rgba(249,115,22,0.08))`,
+              border: `1px solid rgba(249,115,22,0.55)`,
+              color: O, fontSize: 11, fontWeight: 700,
+              cursor: "pointer", padding: "6px 16px", borderRadius: 6,
+              fontFamily: "'Inter', sans-serif", letterSpacing: 2,
+              display: "flex", alignItems: "center", gap: 6,
+              boxShadow: `0 0 12px rgba(249,115,22,0.2)`,
+              transition: "all 0.25s",
+            }}
+            onMouseEnter={e => { e.currentTarget.style.background = "rgba(249,115,22,0.3)"; e.currentTarget.style.boxShadow = "0 0 20px rgba(249,115,22,0.5)"; }}
+            onMouseLeave={e => { e.currentTarget.style.background = "linear-gradient(135deg, rgba(249,115,22,0.18), rgba(249,115,22,0.08))"; e.currentTarget.style.boxShadow = "0 0 12px rgba(249,115,22,0.2)"; }}
+          >
+            ⬡ HQ
+          </button>
         </div>
       </div>
 
@@ -1296,9 +1316,39 @@ function NovaLobby({ onEnterWorld, onAbout, onRook, onBackOffice, visitedAbout }
           <span style={{ color: "white", fontWeight: 700, fontSize: 15 }}>NEXT</span>
           <span style={{ color: "rgba(255,255,255,0.25)", fontSize: 13 }}>Level Solutions</span>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <span style={{ display: "inline-block", width: 7, height: 7, borderRadius: "50%", background: O, boxShadow: `0 0 8px ${O}`, animation: "lobbyBlink 1.8s ease-in-out infinite" }} />
-          <span style={{ color: O, fontSize: 11, fontWeight: 600, letterSpacing: 1.5 }}>AGENT WORLD</span>
+        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <span style={{ display: "inline-block", width: 7, height: 7, borderRadius: "50%", background: O, boxShadow: `0 0 8px ${O}`, animation: "lobbyBlink 1.8s ease-in-out infinite" }} />
+            <span style={{ color: O, fontSize: 11, fontWeight: 600, letterSpacing: 1.5 }}>AGENT WORLD</span>
+          </div>
+          {/* ⬡ HQ — Mission Control entry */}
+          <button
+            onClick={onBackOffice}
+            title="Mission Control"
+            style={{
+              background: `linear-gradient(135deg, ${OR(0.18)}, ${OR(0.08)})`,
+              border: `1px solid ${OR(0.55)}`,
+              color: O, fontSize: 11, fontWeight: 700,
+              cursor: "pointer", padding: "6px 16px",
+              borderRadius: 6,
+              fontFamily: "'Inter', sans-serif",
+              letterSpacing: 2, transition: "all 0.25s",
+              display: "flex", alignItems: "center", gap: 6,
+              boxShadow: `0 0 12px ${OR(0.2)}`,
+            }}
+            onMouseEnter={e => {
+              e.currentTarget.style.background = OR(0.25);
+              e.currentTarget.style.boxShadow = `0 0 20px ${OR(0.45)}`;
+              e.currentTarget.style.borderColor = OR(0.9);
+            }}
+            onMouseLeave={e => {
+              e.currentTarget.style.background = `linear-gradient(135deg, ${OR(0.18)}, ${OR(0.08)})`;
+              e.currentTarget.style.boxShadow = `0 0 12px ${OR(0.2)}`;
+              e.currentTarget.style.borderColor = OR(0.55);
+            }}
+          >
+            ⬡ HQ
+          </button>
         </div>
       </div>
 
@@ -1576,7 +1626,7 @@ export default function App() {
 
   return (
     <div style={{ width: "100vw", height: "100vh", overflow: "hidden", background: "#000" }}>
-      {screen === "door"    && <PortalDoor onEnter={() => setScreen("opening")} />}
+      {screen === "door"    && <PortalDoor onEnter={() => setScreen("opening")} onBackOffice={() => setScreen("backoffice")} />}
       {screen === "opening" && <OpeningAnimation onComplete={() => setScreen("nova")} />}
       {screen === "nova"    && <NovaGreeting onEnterLobby={() => setScreen("lobby")} />}
       {screen === "lobby"   && (
