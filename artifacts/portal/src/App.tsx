@@ -1518,22 +1518,32 @@ function NovaLobby({ onEnterWorld, onAbout, onRook, onBackOffice, visitedAbout }
         🛡 SECURE
       </button>
 
-      {/* ── HQ — admin-only, bottom-right, barely visible ── */}
+      {/* ── HQ — admin-only, bottom-right ── */}
       <button
         onClick={onBackOffice}
         title="Mission Control"
         style={{
           position: "absolute", bottom: 22, right: 26,
-          background: "transparent", border: "none",
-          color: "rgba(255,255,255,0.07)", fontSize: 11,
-          cursor: "pointer", padding: "4px 8px",
+          background: "transparent",
+          border: `1px solid ${OR(0.25)}`,
+          color: OR(0.45), fontSize: 11,
+          cursor: "pointer", padding: "5px 12px",
+          borderRadius: 6,
           fontFamily: "'Inter', sans-serif",
-          letterSpacing: 2.5, transition: "color 0.35s",
+          letterSpacing: 2.5, transition: "all 0.3s",
           display: "flex", alignItems: "center", gap: 5,
           zIndex: 20,
         }}
-        onMouseEnter={e => { e.currentTarget.style.color = OR(0.55); }}
-        onMouseLeave={e => { e.currentTarget.style.color = "rgba(255,255,255,0.07)"; }}
+        onMouseEnter={e => {
+          e.currentTarget.style.color = "#fff";
+          e.currentTarget.style.borderColor = OR(0.7);
+          e.currentTarget.style.background = OR(0.1);
+        }}
+        onMouseLeave={e => {
+          e.currentTarget.style.color = OR(0.45);
+          e.currentTarget.style.borderColor = OR(0.25);
+          e.currentTarget.style.background = "transparent";
+        }}
       >
         ⬡ HQ
       </button>
