@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/office-3d/"
+title = "Virtual Office 3D"
+version = "1.0.0"
+id = "artifacts/office-3d"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/office-3d/" ]
+localPort = 25121
+
+[services.development]
+run = "pnpm --filter @workspace/office-3d run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/office-3d", "run", "build" ]
+publicDir = "artifacts/office-3d/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "25121"
+BASE_PATH = "/office-3d/"

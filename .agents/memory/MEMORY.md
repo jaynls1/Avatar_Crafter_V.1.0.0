@@ -1,0 +1,1 @@
+- [Office-3D artifact setup](office-3d-setup.md) — key quirks for the office-3d artifact: base path, avatar assets, wouter routing.
