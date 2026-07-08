@@ -1,4 +1,4 @@
-modules = ["nodejs-24", "python-3.11"]
+modules = ["nodejs-24", "python-3.11", "postgresql-16"]
 
 [[artifacts]]
 id = "artifacts/api-server"
@@ -29,3 +29,6 @@ timeoutMs = 20000
 
 [userenv.shared]
 BACK_OFFICE_URL = "https://secure-share-linkzip.replit.app"
+
+[nix]
+channel = "stable-25_05"

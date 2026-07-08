@@ -11,6 +11,7 @@ import novaRightProfile1 from "./assets/Nova_Right_Side_Profile_Full1_1776316654
 import novaBackProfile from "./assets/Nova_Back_Side_Profile_Full_1776316654576.png";
 import AboutPage from "./pages/AboutPage";
 import RookCommandCenter from "./components/RookCommandCenter";
+import BackOffice from "./pages/BackOffice";
 
 // nextNLogo, teamPhoto, novaVideo: source files not present in this environment.
 // Using null fallbacks so the app renders; swap in real assets when available.
@@ -53,7 +54,7 @@ function classifyTone(text: string): GestureSet {
   return "calm";
 }
 
-type Screen = "door" | "opening" | "nova" | "lobby" | "about" | "rook";
+type Screen = "door" | "opening" | "nova" | "lobby" | "about" | "rook" | "backoffice";
 
 const O = "#F97316";
 const OL = "#FB923C";
@@ -1259,7 +1260,7 @@ function NovaGreeting({ onEnterLobby }: { onEnterLobby: () => void }) {
   );
 }
 
-function NovaLobby({ onEnterWorld, onAbout, onRook, visitedAbout }: { onEnterWorld: () => void; onAbout: () => void; onRook: () => void; visitedAbout: boolean }) {
+function NovaLobby({ onEnterWorld, onAbout, onRook, onBackOffice, visitedAbout }: { onEnterWorld: () => void; onAbout: () => void; onRook: () => void; onBackOffice: () => void; visitedAbout: boolean }) {
   const [opening, setOpening] = useState(false);
 
   const handleOpen = () => {
@@ -1517,6 +1518,26 @@ function NovaLobby({ onEnterWorld, onAbout, onRook, visitedAbout }: { onEnterWor
         🛡 SECURE
       </button>
 
+      {/* ── HQ — admin-only, bottom-right, barely visible ── */}
+      <button
+        onClick={onBackOffice}
+        title="Mission Control"
+        style={{
+          position: "absolute", bottom: 22, right: 26,
+          background: "transparent", border: "none",
+          color: "rgba(255,255,255,0.07)", fontSize: 11,
+          cursor: "pointer", padding: "4px 8px",
+          fontFamily: "'Inter', sans-serif",
+          letterSpacing: 2.5, transition: "color 0.35s",
+          display: "flex", alignItems: "center", gap: 5,
+          zIndex: 20,
+        }}
+        onMouseEnter={e => { e.currentTarget.style.color = OR(0.55); }}
+        onMouseLeave={e => { e.currentTarget.style.color = "rgba(255,255,255,0.07)"; }}
+      >
+        ⬡ HQ
+      </button>
+
       <style>{`
         @keyframes lobbyAura {
           0%,100% { opacity: 0.72; transform: translate(-50%,-50%) scale(1); }
@@ -1553,11 +1574,13 @@ export default function App() {
           onEnterWorld={() => window.location.href = "/"}
           onAbout={() => setScreen("about")}
           onRook={() => setScreen("rook")}
+          onBackOffice={() => setScreen("backoffice")}
           visitedAbout={visitedAbout}
         />
       )}
-      {screen === "about"   && <AboutPage onBack={() => { setVisitedAbout(true); setScreen("lobby"); }} />}
-      {screen === "rook"    && <RookCommandCenter onBack={() => setScreen("lobby")} />}
+      {screen === "about"      && <AboutPage onBack={() => { setVisitedAbout(true); setScreen("lobby"); }} />}
+      {screen === "rook"       && <RookCommandCenter onBack={() => setScreen("lobby")} />}
+      {screen === "backoffice" && <BackOffice onBack={() => setScreen("lobby")} />}
     </div>
   );
 }
