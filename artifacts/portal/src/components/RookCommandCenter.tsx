@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef } from "react";
-import rookImg from "@assets/agents/rook/idle.png";
+
+// Rook portrait asset not present in this environment — using a styled
+// placeholder below instead of a missing image import.
 
 const R   = "#dc2626";
 const RL  = "#ef4444";

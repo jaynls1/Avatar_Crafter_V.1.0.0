@@ -1,20 +1,22 @@
 import { useState, useEffect, useRef } from "react";
-import novaFrontImg from "@assets/Nova_Front_Full_Profile_1778046427686.png";
-import novaOpeningDoor from "@assets/Nova_Opening_Door_1778046874739_nobg.png";
-import nextNLogo from "@assets/ChatGPT_Image_Apr_18,_2026,_01_28_11_PM_1778050931948.png";
-import teamPhoto from "@assets/Untitled_(1376_x_1024_px)_1778050980081.jpg";
-import novaHandInPocket from "@assets/Nova_Front_Handinpocket_Full_1778046427690.png";
-import novaHandsUp from "@assets/Nova_Walking_Hands_Up_1778046427713.png";
-import novaHandsUp1 from "@assets/Nova_Walking_Hands_Up1_1778046427714.png";
-import novaWalkingDown from "@assets/Nova_Walking_Hands_Down_1778046427713.png";
-import novaLeftProfile from "@assets/Nova_Left_Side_Profile_Full_1778046427699.png";
-import novaRightProfile from "@assets/Nova_Right_Side_Profile_Full_1778046427712.png";
-import novaRightProfile1 from "@assets/Nova_Right_Side_Profile_Full1_1778046427712.png";
-import novaBackProfile from "@assets/Nova_Back_Side_Profile_Full_1778046427685.png";
-// @ts-ignore
-import novaVideo from "@assets/4181d6a9-457f-4656-bd50-5b39213e4d7d_1778046462319.mp4";
+import novaFrontImg from "./assets/Nova_Front_Full_Profile_1776316654576.png";
+import novaOpeningDoor from "./assets/Nova_Opening_Door_1776316654577.jpg";
+import novaHandInPocket from "./assets/Nova_Front_Handinpocket_Full_1776316654576.png";
+import novaHandsUp from "./assets/Nova_Walking_Hands_Up_1776316654578.png";
+import novaHandsUp1 from "./assets/Nova_Walking_Hands_Up1_1776316654578.png";
+import novaWalkingDown from "./assets/Nova_Walking_Hands_Down_1776316654577.png";
+import novaLeftProfile from "./assets/Nova_Left_Side_Profile_Full_1776316654577.png";
+import novaRightProfile from "./assets/Nova_Right_Side_Profile_Full_1776316654577.png";
+import novaRightProfile1 from "./assets/Nova_Right_Side_Profile_Full1_1776316654577.png";
+import novaBackProfile from "./assets/Nova_Back_Side_Profile_Full_1776316654576.png";
 import AboutPage from "./pages/AboutPage";
 import RookCommandCenter from "./components/RookCommandCenter";
+
+// nextNLogo, teamPhoto, novaVideo: source files not present in this environment.
+// Using null fallbacks so the app renders; swap in real assets when available.
+const nextNLogo: string | null = null;
+const teamPhoto: string | null = null;
+const novaVideo: string | null = null;
 
 // ── GESTURE SETS — context-aware pose sequences ────────────────────────────
 // Each set is played in order (looping) while Nova speaks.
