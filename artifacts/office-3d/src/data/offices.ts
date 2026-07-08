@@ -22,7 +22,7 @@ export const OFFICES: Office[] = [
   { id: "iggy",   name: "Iggy",   title: "Innovation Garage",      hallway: "right", accentColor: "#fb923c", path: "/office/iggy"  },
   { id: "anchor", name: "Anchor", title: "Mission Control",        hallway: "right", accentColor: "#818cf8", path: "/office/anchor"},
   { id: "haven",  name: "Haven",  title: "Sanctuary",              hallway: "right", accentColor: "#f9a8d4", path: "/office/haven" },
-  { id: "breakroom", name: "Breakroom", title: "Take a breather",  hallway: "right", accentColor: "#4ade80", path: "/breakroom", isBreakroom: true, breakroomUrl: "https://example.com" },
+  { id: "breakroom", name: "Breakroom", title: "Take a breather",  hallway: "right", accentColor: "#4ade80", path: "/breakroom", isBreakroom: true, breakroomUrl: "https://the-break-room-project.vercel.app/" },
 ];
 
 export function getHallwayOffices(side: string): Office[] {
