@@ -9,19 +9,25 @@ interface Message { role: "user" | "assistant"; content: string; }
 interface PromptVersion { id: number; agentId: string; content: string; active: boolean; createdAt: string; }
 interface AgentStatus { agentId: string; lastActive: string | null; conversationCount: number; hasCustomPrompt: boolean; state: string; }
 
-function useAdminAuth() {
-  const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
+type AuthState = { status: "loading" } | { status: "unauthenticated" } | { status: "not-admin" } | { status: "admin" };
+
+function useAdminAuth(): AuthState {
+  const [state, setState] = useState<AuthState>({ status: "loading" });
   useEffect(() => {
     fetch("/api/auth/user", { credentials: "include" })
       .then(r => r.json())
-      .then(d => setIsAdmin(d?.user?.isAdmin === true))
-      .catch(() => setIsAdmin(false));
+      .then(d => {
+        if (!d?.user) setState({ status: "unauthenticated" });
+        else if (d.user.isAdmin === true) setState({ status: "admin" });
+        else setState({ status: "not-admin" });
+      })
+      .catch(() => setState({ status: "unauthenticated" }));
   }, []);
-  return isAdmin;
+  return state;
 }
 
 export default function BackOffice({ onBack }: { onBack: () => void }) {
-  const isAdmin = useAdminAuth();
+  const authState = useAdminAuth();
   const [tab, setTab] = useState<"chat" | "prompts" | "status">("chat");
   const [selectedAgent, setSelectedAgent] = useState("Atlas");
   const [messages, setMessages] = useState<Message[]>([]);
@@ -45,6 +51,8 @@ export default function BackOffice({ onBack }: { onBack: () => void }) {
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  const isAdmin = authState.status === "admin";
 
   useEffect(() => {
     if (isAdmin && tab === "chat") loadConversation(selectedAgent);
@@ -195,7 +203,7 @@ export default function BackOffice({ onBack }: { onBack: () => void }) {
     }
   }
 
-  if (isAdmin === null) {
+  if (authState.status === "loading") {
     return (
       <div style={{ width: "100vw", height: "100vh", background: "#050507", display: "flex", alignItems: "center", justifyContent: "center", color: OR(0.5), fontFamily: "'Inter',sans-serif", fontSize: 13, letterSpacing: 2 }}>
         AUTHENTICATING...
@@ -203,7 +211,23 @@ export default function BackOffice({ onBack }: { onBack: () => void }) {
     );
   }
 
-  if (!isAdmin) {
+  if (authState.status === "unauthenticated") {
+    return (
+      <div style={{ width: "100vw", height: "100vh", background: "#050507", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", fontFamily: "'Inter',sans-serif", gap: 16 }}>
+        <div style={{ color: O, fontSize: 28 }}>⬡</div>
+        <div style={{ color: "rgba(255,255,255,0.7)", fontSize: 15, fontWeight: 600 }}>NEXT HQ</div>
+        <div style={{ color: "rgba(255,255,255,0.35)", fontSize: 12, letterSpacing: 1, marginBottom: 8 }}>Sign in to access Mission Control</div>
+        <a href="/api/login?returnTo=/portal/" style={{
+          background: `linear-gradient(135deg,${O},#ea580c)`, border: "none", borderRadius: 8,
+          color: "#fff", padding: "10px 28px", cursor: "pointer", fontSize: 13, fontWeight: 600,
+          textDecoration: "none", letterSpacing: 0.5,
+        }}>Sign In →</a>
+        <button onClick={onBack} style={{ background: "transparent", border: "none", color: OR(0.35), padding: "6px 12px", cursor: "pointer", fontSize: 12, marginTop: 4 }}>← Back</button>
+      </div>
+    );
+  }
+
+  if (authState.status === "not-admin") {
     return (
       <div style={{ width: "100vw", height: "100vh", background: "#050507", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", fontFamily: "'Inter',sans-serif" }}>
         <div style={{ color: "#ef4444", fontSize: 32, marginBottom: 12 }}>⛔</div>
