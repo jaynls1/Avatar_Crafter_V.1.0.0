@@ -4,6 +4,7 @@ import authRouter from "./auth";
 import openaiRouter from "./openai/index";
 import agentsRouter from "./agents";
 import securityRouter from "./security";
+import roomsRouter from "./rooms";
 
 const router: IRouter = Router();
 
@@ -12,5 +13,6 @@ router.use(authRouter);
 router.use(openaiRouter);
 router.use(agentsRouter);
 router.use(securityRouter);
+router.use(roomsRouter);
 
 export default router;
