@@ -33,6 +33,14 @@ export function extractTaskDirectives(
   return found;
 }
 
+function buildConversationUrl(conversationId: number): string {
+  const domain =
+    process.env.REPLIT_DEV_DOMAIN ??
+    process.env.REPLIT_DOMAINS?.split(",")[0] ??
+    "localhost";
+  return `https://${domain}/portal?convId=${conversationId}`;
+}
+
 export async function createClickUpTask(opts: {
   name: string;
   description: string;
@@ -44,6 +52,17 @@ export async function createClickUpTask(opts: {
   const listId = process.env.CLICKUP_LIST_ID;
   if (!token || !listId) return null;
 
+  const convUrl = buildConversationUrl(opts.conversationId);
+  const fullDescription = [
+    `Assigned by: ${opts.fromAgent}`,
+    `Assigned to: ${opts.toAgent}`,
+    `Conversation: ${convUrl}`,
+    ``,
+    opts.description,
+  ]
+    .join("\n")
+    .slice(0, 8000);
+
   try {
     const res = await fetch(`${CLICKUP_API}/list/${listId}/task`, {
       method: "POST",
@@ -53,9 +72,18 @@ export async function createClickUpTask(opts: {
       },
       body: JSON.stringify({
         name: opts.name.slice(0, 200),
-        description: `From: ${opts.fromAgent}\nTo: ${opts.toAgent}\nConversation #${opts.conversationId}\n\n${opts.description}`.slice(0, 2000),
-        tags: [opts.fromAgent.toLowerCase(), opts.toAgent.toLowerCase(), "agent-task"],
+        description: fullDescription,
+        markdown_description: [
+          `**Assigned by:** ${opts.fromAgent}`,
+          `**Assigned to:** ${opts.toAgent}`,
+          `**Conversation:** [View #${opts.conversationId}](${convUrl})`,
+          ``,
+          `---`,
+          opts.description,
+        ].join("\n").slice(0, 8000),
+        tags: [opts.fromAgent.toLowerCase(), opts.toAgent.toLowerCase(), "agent-task", "next-hq"],
         notify_all: false,
+        custom_fields: [],
       }),
     });
     if (!res.ok) return null;
