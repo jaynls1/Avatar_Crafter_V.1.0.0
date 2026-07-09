@@ -10,6 +10,7 @@ import {
 import { openai } from "@workspace/integrations-openai-ai-server";
 import { buildSystemPrompt, invalidatePromptCache } from "../lib/agentPersonalities";
 import { adminMiddleware } from "../middlewares/adminMiddleware";
+import { scheduleNotionSync, scheduleClickUpScan } from "../lib/memory-sync";
 
 const adminRouter = Router();
 
@@ -193,6 +194,9 @@ adminRouter.post("/admin/conversations/:agentId/messages", async (req, res) => {
 
   res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
   res.end();
+
+  scheduleNotionSync(conv.id, agentId, conv.title);
+  scheduleClickUpScan(agentId, fullResponse, conv.id);
 });
 
 adminRouter.post("/admin/broadcast", async (req, res) => {

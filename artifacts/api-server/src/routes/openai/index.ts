@@ -4,6 +4,7 @@ import { db } from "@workspace/db";
 import { conversations, messages } from "@workspace/db/schema";
 import { openai } from "@workspace/integrations-openai-ai-server";
 import { buildSystemPrompt } from "../../lib/agentPersonalities";
+import { scheduleNotionSync, scheduleClickUpScan } from "../../lib/memory-sync";
 
 const openaiRouter = Router();
 
@@ -122,6 +123,9 @@ openaiRouter.post("/openai/conversations/:id/messages", async (req, res) => {
 
   res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
   res.end();
+
+  scheduleNotionSync(id, conversation.agentId, conversation.title);
+  scheduleClickUpScan(conversation.agentId, fullResponse, id);
 });
 
 export default openaiRouter;

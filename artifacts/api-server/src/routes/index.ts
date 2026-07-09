@@ -6,6 +6,7 @@ import agentsRouter from "./agents";
 import securityRouter from "./security";
 import roomsRouter from "./rooms";
 import adminRouter from "./admin";
+import memoryRouter from "./memory";
 
 const router: IRouter = Router();
 
@@ -16,5 +17,6 @@ router.use(agentsRouter);
 router.use(securityRouter);
 router.use(roomsRouter);
 router.use(adminRouter);
+router.use(memoryRouter);
 
 export default router;
