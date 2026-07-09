@@ -1,6 +1,1 @@
-- [Office-3D artifact setup](office-3d-setup.md) — key quirks for the office-3d artifact: base path, avatar assets, wouter routing.
-- [Back Office Admin Panel](back-office-admin-panel.md) — DB schema, admin routes, portal UI all wired; key patterns for extending.
-- [Notion memory pipeline](notion-memory-pipeline.md) — uses @replit/connectors-sdk proxy (not @notionhq/client directly); connection must be proposeIntegration'd to bind per-Repl
-- [ClickUp task relay](clickup-task-relay.md) — no Replit integration; uses direct REST API; needs CLICKUP_API_TOKEN + CLICKUP_LIST_ID secrets
-- [Drizzle raw SQL](drizzle-raw-sql.md) — use sql\`...\` template from drizzle-orm, NOT db.execute("string", [params]) — parameterized strings don't work
-- [API server TypeScript errors](api-server-ts-errors.md) — pre-existing TS errors in api-server (missing exports from @workspace/db/schema etc) are non-blocking; server runs fine via tsx without type-checking
+- [Git config edits are sandbox-blocked](git-config-restricted.md) — any write to .git/ (via git, sed, or direct file edit) is hard-blocked in this environment; fix remotes via Replit's Git pane UI, not code tools.
