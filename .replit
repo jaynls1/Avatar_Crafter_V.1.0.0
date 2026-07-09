@@ -33,3 +33,6 @@ BACK_OFFICE_URL = "https://secure-share-linkzip.replit.app"
 
 [nix]
 channel = "stable-25_05"
+
+[objectStorage]
+defaultBucketID = "replit-objstore-6a8b0c82-e2d5-41b5-8703-bc8bede46aa4"
