@@ -1,0 +1,147 @@
+#52 - Prevent Theater from breaking when AI image generation is slow or fails
+What & Why
+The theater backend calls gpt-image-1 and TTS in parallel and returns null for failed results. The frontend needs graceful handling for: partial results (narration but no image, or image but no audio), long generation times >30s (add streaming progress), and network errors mid-flight. Currently failures silently show nothing.
+
+Done looks like
+Loading state shows estimated progress ("Generating scene… Composing narration…")
+If image fails but narration succeeds, show agent color gradient backdrop + play audio still
+If audio fails but image succeeds, show image with typewriter text only (no audio)
+Timeout after 45s with a user-friendly retry option
+Relevant files
+artifacts/avatar-world/src/components/KnowledgeTheater.tsx — loading/error states (lines 1-100)
+artifacts/api-server/src/routes/theater.ts — Promise.allSettled fallback logic
+Dependencies
+
+Magic Screen — Knowledge Theater
+Open
+
+
+#75 - Prevent the theater from calling 'close' twice if the animation delay and the escape button overlap
+What & Why
+The 1.8 s exit timer and the 3 s force-close button both call onClose() independently. In a stall scenario the 1.8 s timer fires onClose at 1.8 s (parent doesn't respond), then the user clicks force-close at 3 s and onClose fires a second time. The parent may not be idempotent on double close calls, leading to subtle state corruption.
+
+Done looks like
+onClose is wrapped in a once-guard inside TheaterRoom so the second call is a no-op regardless of which path fires first
+The guard is reset when the theater re-mounts (each mount starts fresh)
+Force-close button and the 1.8 s timer both remain in place — only the redundant second call is suppressed
+Relevant files
+artifacts/avatar-world/src/components/TheaterRoom.tsx — TheaterRoom component, exitCalledRef (~line 1423), force-close button onClick (~line 1753), exit useEffect (~line 1610)
+Dependencies
+
+Show an emergency exit button if the theater curtains never finish closing
+Open task
+
+
+#74 - Show an emergency exit button if the theater curtains never finish closing
+What & Why
+The exit animation is now bulletproofed against unmount and SSE races, but if the curtain animation itself glitches visually (e.g., a Three.js render hiccup or a slow frame rate spike), the user sees no way out for 1.8 s. Adding a timed fallback button gives members an escape route without needing to refresh.
+
+Done looks like
+A transparent "Force close ✕" button appears after 3 s if state is still "exit"
+It calls onClose() directly (bypassing the animation timer) and is styled subtly so it doesn't intrude on normal exits
+The button does not appear during normal quick exits (animation finishes in ~1.8 s)
+Relevant files
+artifacts/avatar-world/src/components/TheaterRoom.tsx — TheaterRoom component, exit useEffect (~line 1598), CinematicCurtains render (~line 1638)
+Dependencies
+
+Prevent theater from getting stuck if the close animation never fires
+Open task
+
+#69 - Prevent theater from getting stuck if the close animation never fires
+What & Why
+The exit animation calls onClose after 1.8s via setTimeout. If the component unmounts before the timer fires (e.g. parent forces close), or if a future code change resets the state mid-exit, the theater could get stuck in "exit" state or double-call onClose. Adding a safety abort-on-unmount pattern makes this bulletproof.
+
+Done looks like
+The exit useEffect cleanup cancels any pending onClose call on unmount
+The existing exitCalledRef guard is verified to prevent double-fires across re-renders
+Edge case: if state flips back from "exit" to another state (e.g., EventBus error event), the timer is cleared correctly
+Relevant files
+artifacts/avatar-world/src/components/TheaterRoom.tsx — TheaterRoom component, exit useEffect (~line 1553), exitCalledRef (~line 1385)
+Dependencies
+
+Give the Theater a real cinematic entrance with pre-show ambiance
+Open task
+
+
+
+#68 - Let users share a Knowledge Theater highlight with a public link
+What & Why
+Users can already save highlights (saved to DB + object storage). The missing piece is sharing — a unique URL like /theater/highlight/:id that renders the image, narration, and agent card publicly, so users can share cinematic AI moments with clients or on social media.
+
+Done looks like
+Each saved highlight gets a shareable public URL: /api/theater/highlights/:id/share
+The URL returns a lightweight HTML page (or JSON for embedding) with the image, narration, agent info, and NEXT branding
+The HighlightsPanel (TheaterRoom.tsx, ~line 1200+) has a "Share" copy-link button per highlight
+The link works without authentication
+Relevant files
+artifacts/api-server/src/routes/theater-highlights.ts — add GET /:id/share endpoint
+artifacts/api-server/src/routes/storage.ts — public object serving pattern
+artifacts/avatar-world/src/components/TheaterRoom.tsx — HighlightsPanel component
+Dependencies
+
+Give the Theater a real cinematic entrance with pre-show ambiance
+Open task
+
+#47 - Let each specialty filter button show its own color in the sidebar
+What & Why
+The sidebar specialty filter buttons (in AgentSelector) all use the same purple (#A78BFA) regardless of which specialty they represent. Now that each specialty has a resolved accent color (driven by the agents that share it), the filter chips could reflect that color — matching the pill glow color that was just added to the 3D world.
+
+Done looks like
+Each specialty filter chip in AgentSelector is tinted with the accentColor of agents who share that specialty
+Active filter chip glows or highlights in the same color shown on the 3D pill
+Inactive chips use a muted version of that color
+Relevant files
+artifacts/avatar-world/src/components/AgentSelector.tsx (specialty filter chip rendering, currently uses static #A78BFA)
+artifacts/avatar-world/src/components/Scene3D.tsx (resolveFilterColor helper, already exists, can be shared)
+Dependencies
+
+Let the specialty pill glow color change to match whichever filter is active
+Open task
+
+
+#51 - Give the Theater a real cinematic entrance with pre-show ambiance
+What & Why
+The Knowledge Theater currently fades in as a flat overlay. A proper cinematic entry sequence (curtains drawing back, projector flicker, audience ambient sound) would dramatically improve the "wow" factor and signal to members that something special is happening.
+
+Done looks like
+Opening animation: dark screen → projector beam effect → curtains part → screen reveals
+Optional ambient "cinema hum" audio loop while idle (using Web Audio API)
+Smooth exit animation when closing (curtains close, fade to black)
+State machine in KnowledgeTheater handles: pre-show → idle → loading → playing → exit
+Relevant files
+artifacts/avatar-world/src/components/KnowledgeTheater.tsx
+CSS keyframes for curtain animation (add to component inline styles or index.css)
+Dependencies
+
+
+
+
+#53 - Keep the specialty ring and pill breathing together when agents use different time offsets
+What & Why
+Each AvatarAgent instance adds a random timeOffset to its clock before computing the specialty pulse. This means two agents highlighted at the same time still breathe at different absolute phases — the shared frequency is correct but the per-agent offset breaks the "one organism" feeling across the world. If the designer ever wants all specialty highlights to pulse in global unison (e.g. during a filtered view), the offset would need to be zeroed out or replaced with a global clock.
+
+Done looks like
+A design decision is made: per-agent offset kept (current) OR removed for specialty highlights
+If removed, the specialtyPulse line uses state.clock.elapsedTime directly instead of t
+No regression to the existing breathing/sway animations that intentionally use the offset
+Relevant files
+artifacts/avatar-world/src/components/AvatarAgent.tsx — timeOffset ref and specialtyPulse computation
+Dependencies
+
+Pulse the specialty ring glow in sync with the pill shimmer for a unified effect
+Open task
+
+
+#75 - Prevent the theater from calling 'close' twice if the animation delay and the escape button overlap
+What & Why
+The 1.8 s exit timer and the 3 s force-close button both call onClose() independently. In a stall scenario the 1.8 s timer fires onClose at 1.8 s (parent doesn't respond), then the user clicks force-close at 3 s and onClose fires a second time. The parent may not be idempotent on double close calls, leading to subtle state corruption.
+
+Done looks like
+onClose is wrapped in a once-guard inside TheaterRoom so the second call is a no-op regardless of which path fires first
+The guard is reset when the theater re-mounts (each mount starts fresh)
+Force-close button and the 1.8 s timer both remain in place — only the redundant second call is suppressed
+Relevant files
+artifacts/avatar-world/src/components/TheaterRoom.tsx — TheaterRoom component, exitCalledRef (~line 1423), force-close button onClick (~line 1753), exit useEffect (~line 1610)
+Dependencies
+
+Show an emergency exit button if the theater curtains never finish closing
