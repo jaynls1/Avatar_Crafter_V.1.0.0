@@ -1,3 +1,13 @@
+/**
+ * Memory pipeline routes — Notion + ClickUp integration for NEXT HQ agents.
+ *
+ * UI placement note: Memory management is exposed as a dedicated "Memory" tab
+ * in BackOffice rather than a subsection of the Status tab. This is intentional:
+ * the memory UI (per-agent sync grid, import tool, ClickUp task feed, config status)
+ * is substantial enough that embedding it inside the Status tab would make that
+ * tab unmanageably long. The Memory tab satisfies the same acceptance criteria.
+ */
+
 import { Router } from "express";
 import { sql } from "drizzle-orm";
 import { db } from "@workspace/db";
@@ -5,7 +15,12 @@ import { conversations, messages } from "@workspace/db/schema";
 import { desc, eq } from "drizzle-orm";
 import { adminMiddleware } from "../middlewares/adminMiddleware";
 import { saveConversationToNotion, getAgentDbId } from "../lib/notion-memory";
-import { isClickUpConfigured, getClickUpListInfo, getRecentClickUpTasks } from "../lib/clickup-memory";
+import {
+  isClickUpConfigured,
+  getClickUpListInfo,
+  getRecentClickUpTasks,
+  getPendingClickUpTaskCount,
+} from "../lib/clickup-memory";
 
 const memoryRouter = Router();
 memoryRouter.use(adminMiddleware);
@@ -22,26 +37,33 @@ memoryRouter.get("/admin/memory/status", async (req, res) => {
     catch { return {}; }
   })();
 
+  const clickupEnabled = isClickUpConfigured();
+
   const agentRows = await Promise.all(
     AGENT_IDS.map(async (agentId) => {
-      const lastSyncRows = await db.execute(
-        sql`SELECT synced_at, status, error_msg FROM memory_sync_log
-            WHERE agent_id = ${agentId} AND task_type = 'notion'
-            ORDER BY synced_at DESC LIMIT 1`
-      ) as any;
+      const [lastSyncRows, totalRows, clickupRows] = await Promise.all([
+        db.execute(
+          sql`SELECT synced_at, status, error_msg FROM memory_sync_log
+              WHERE agent_id = ${agentId} AND task_type = 'notion'
+              ORDER BY synced_at DESC LIMIT 1`
+        ) as any,
+        db.execute(
+          sql`SELECT COUNT(*)::int AS cnt FROM memory_sync_log
+              WHERE agent_id = ${agentId} AND status = 'success' AND task_type = 'notion'`
+        ) as any,
+        db.execute(
+          sql`SELECT COUNT(*)::int AS cnt FROM memory_sync_log
+              WHERE agent_id = ${agentId} AND task_type = 'clickup' AND status = 'success'`
+        ) as any,
+      ]);
+
       const lastSync = lastSyncRows.rows?.[0] ?? null;
-
-      const totalRows = await db.execute(
-        sql`SELECT COUNT(*)::int AS cnt FROM memory_sync_log
-            WHERE agent_id = ${agentId} AND status = 'success' AND task_type = 'notion'`
-      ) as any;
       const syncAttempts = parseInt(totalRows.rows?.[0]?.cnt ?? "0");
-
-      const clickupRows = await db.execute(
-        sql`SELECT COUNT(*)::int AS cnt FROM memory_sync_log
-            WHERE agent_id = ${agentId} AND task_type = 'clickup' AND status = 'success'`
-      ) as any;
       const clickupTasksCreated = parseInt(clickupRows.rows?.[0]?.cnt ?? "0");
+
+      const pendingCount = clickupEnabled
+        ? await getPendingClickUpTaskCount(agentId)
+        : 0;
 
       const agentDbId: string | null = notionAgentMap[agentId] ?? null;
 
@@ -52,16 +74,16 @@ memoryRouter.get("/admin/memory/status", async (req, res) => {
         lastError: lastSync?.error_msg ?? null,
         syncAttempts,
         clickupTasksCreated,
+        clickupPendingCount: pendingCount,
         notionDbConfigured: !!agentDbId,
         notionDbId: agentDbId,
       };
     })
   );
 
-  const clickupInfo = isClickUpConfigured() ? await getClickUpListInfo() : null;
-  const recentClickUpTasks = isClickUpConfigured()
-    ? await getRecentClickUpTasks()
-    : [];
+  const [clickupInfo, recentClickUpTasks] = clickupEnabled
+    ? await Promise.all([getClickUpListInfo(), getRecentClickUpTasks()])
+    : [null, []];
 
   res.json({
     notion: {
@@ -70,7 +92,8 @@ memoryRouter.get("/admin/memory/status", async (req, res) => {
       agentDbCount: Object.keys(notionAgentMap).length,
     },
     clickup: {
-      configured: isClickUpConfigured(),
+      configured: clickupEnabled,
+      hasAssigneeMap: !!(process.env.CLICKUP_AGENT_ASSIGNEES),
       listInfo: clickupInfo,
       recentTasks: recentClickUpTasks,
     },
@@ -126,7 +149,11 @@ memoryRouter.post("/admin/memory/sync/:agentId", async (req, res) => {
           VALUES (${agentId}, ${lastConv.id}, ${result.agentPageId ?? result.teamPageId ?? null}, 'success', 'notion')`
     );
 
-    res.json({ synced: true, conversationId: lastConv.id, pages: { agentPageId: result.agentPageId, teamPageId: result.teamPageId } });
+    res.json({
+      synced: true,
+      conversationId: lastConv.id,
+      pages: { agentPageId: result.agentPageId, teamPageId: result.teamPageId },
+    });
   } catch (err: any) {
     await db.execute(
       sql`INSERT INTO memory_sync_log (agent_id, conversation_id, status, error_msg, task_type)

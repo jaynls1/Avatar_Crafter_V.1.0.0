@@ -14,6 +14,8 @@ const KNOWN_AGENTS = new Set([
   "Indy", "Rook", "Iggy", "Anchor", "Haven",
 ]);
 
+const DONE_STATUSES = new Set(["complete", "closed", "done", "resolved", "cancelled"]);
+
 export function extractTaskDirectives(
   text: string,
   fromAgent: string
@@ -41,6 +43,18 @@ function buildConversationUrl(conversationId: number): string {
   return `https://${domain}/portal?convId=${conversationId}`;
 }
 
+function getAgentAssigneeId(agentId: string): number | null {
+  const mapStr = process.env.CLICKUP_AGENT_ASSIGNEES;
+  if (!mapStr) return null;
+  try {
+    const map = JSON.parse(mapStr) as Record<string, number | string>;
+    const val = map[agentId];
+    return val != null ? Number(val) : null;
+  } catch {
+    return null;
+  }
+}
+
 export async function createClickUpTask(opts: {
   name: string;
   description: string;
@@ -63,6 +77,33 @@ export async function createClickUpTask(opts: {
     .join("\n")
     .slice(0, 8000);
 
+  const assigneeId = getAgentAssigneeId(opts.toAgent);
+  const payload: Record<string, unknown> = {
+    name: opts.name.slice(0, 200),
+    description: fullDescription,
+    markdown_description: [
+      `**Assigned by:** ${opts.fromAgent}`,
+      `**Assigned to:** ${opts.toAgent}`,
+      `**Conversation:** [View #${opts.conversationId}](${convUrl})`,
+      ``,
+      `---`,
+      opts.description,
+    ]
+      .join("\n")
+      .slice(0, 8000),
+    tags: [
+      opts.fromAgent.toLowerCase(),
+      opts.toAgent.toLowerCase(),
+      "agent-task",
+      "next-hq",
+    ],
+    notify_all: false,
+  };
+
+  if (assigneeId != null) {
+    payload.assignees = [assigneeId];
+  }
+
   try {
     const res = await fetch(`${CLICKUP_API}/list/${listId}/task`, {
       method: "POST",
@@ -70,28 +111,7 @@ export async function createClickUpTask(opts: {
         "Content-Type": "application/json",
         Authorization: token,
       },
-      body: JSON.stringify({
-        name: opts.name.slice(0, 200),
-        description: fullDescription,
-        markdown_description: [
-          `**Assigned by:** ${opts.fromAgent}`,
-          `**Assigned to:** ${opts.toAgent}`,
-          `**Conversation:** [View #${opts.conversationId}](${convUrl})`,
-          ``,
-          `---`,
-          opts.description,
-        ]
-          .join("\n")
-          .slice(0, 8000),
-        tags: [
-          opts.fromAgent.toLowerCase(),
-          opts.toAgent.toLowerCase(),
-          "agent-task",
-          "next-hq",
-        ],
-        notify_all: false,
-        custom_fields: [],
-      }),
+      body: JSON.stringify(payload),
     });
     if (!res.ok) return null;
     const data = (await res.json()) as { id: string };
@@ -143,34 +163,52 @@ export async function getClickUpListInfo(): Promise<{ name: string; taskCount: n
   }
 }
 
-export async function getRecentClickUpTasks(agentId?: string): Promise<
-  Array<{ id: string; name: string; url: string; fromAgent: string; toAgent: string }>
-> {
-  const token = process.env.CLICKUP_API_TOKEN;
-  const listId = process.env.CLICKUP_LIST_ID;
-  if (!token || !listId) return [];
+type ClickUpRawTask = {
+  id: string;
+  name: string;
+  url: string;
+  status?: { status?: string };
+  tags?: Array<{ name: string }>;
+};
+
+async function fetchTasksByTag(tag: string): Promise<ClickUpRawTask[]> {
+  const token = process.env.CLICKUP_API_TOKEN!;
+  const listId = process.env.CLICKUP_LIST_ID!;
   try {
-    const tag = agentId ? agentId.toLowerCase() : "agent-task";
     const res = await fetch(
-      `${CLICKUP_API}/list/${listId}/task?tags[]=${encodeURIComponent(tag)}&order_by=date_created&reverse=true&page=0&limit=10`,
+      `${CLICKUP_API}/list/${listId}/task?tags[]=${encodeURIComponent(tag)}&order_by=date_created&reverse=true&page=0&limit=20&include_closed=true`,
       { headers: { Authorization: token } }
     );
     if (!res.ok) return [];
-    const data = (await res.json()) as { tasks?: Array<{ id: string; name: string; url: string; tags?: Array<{ name: string }> }> };
-    return (data.tasks ?? []).slice(0, 10).map((t) => {
-      const tagNames = (t.tags ?? []).map((tg) => tg.name);
-      const agents = tagNames.filter(
-        (n) => n !== "agent-task" && n !== "next-hq"
-      );
-      return {
-        id: t.id,
-        name: t.name,
-        url: t.url ?? `https://app.clickup.com/t/${t.id}`,
-        fromAgent: agents[0] ?? "unknown",
-        toAgent: agents[1] ?? "unknown",
-      };
-    });
+    const data = (await res.json()) as { tasks?: ClickUpRawTask[] };
+    return data.tasks ?? [];
   } catch {
     return [];
   }
+}
+
+export async function getRecentClickUpTasks(agentId?: string): Promise<
+  Array<{ id: string; name: string; url: string; fromAgent: string; toAgent: string; status: string }>
+> {
+  if (!isClickUpConfigured()) return [];
+  const tag = agentId ? agentId.toLowerCase() : "agent-task";
+  const rawTasks = await fetchTasksByTag(tag);
+  return rawTasks.slice(0, 10).map((t) => {
+    const tagNames = (t.tags ?? []).map((tg) => tg.name);
+    const agents = tagNames.filter((n) => n !== "agent-task" && n !== "next-hq");
+    return {
+      id: t.id,
+      name: t.name,
+      url: t.url ?? `https://app.clickup.com/t/${t.id}`,
+      fromAgent: agents[0] ?? "unknown",
+      toAgent: agents[1] ?? "unknown",
+      status: t.status?.status ?? "open",
+    };
+  });
+}
+
+export async function getPendingClickUpTaskCount(agentId: string): Promise<number> {
+  if (!isClickUpConfigured()) return 0;
+  const rawTasks = await fetchTasksByTag(agentId.toLowerCase());
+  return rawTasks.filter((t) => !DONE_STATUSES.has((t.status?.status ?? "").toLowerCase())).length;
 }

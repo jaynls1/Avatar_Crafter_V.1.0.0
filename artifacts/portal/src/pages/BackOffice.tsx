@@ -11,12 +11,13 @@ interface AgentStatus { agentId: string; lastActive: string | null; conversation
 interface AgentMemoryRow {
   agentId: string; lastSyncedAt: string | null; lastStatus: string;
   lastError: string | null; syncAttempts: number; clickupTasksCreated: number;
+  clickupPendingCount: number;
   notionDbConfigured: boolean; notionDbId: string | null;
 }
-interface ClickUpTask { id: string; name: string; url: string; fromAgent: string; toAgent: string; }
+interface ClickUpTask { id: string; name: string; url: string; fromAgent: string; toAgent: string; status: string; }
 interface MemoryStatus {
   notion: { configured: boolean; teamDbId: string | null; agentDbCount: number };
-  clickup: { configured: boolean; listInfo: { name: string; taskCount: number } | null; recentTasks: ClickUpTask[] };
+  clickup: { configured: boolean; hasAssigneeMap: boolean; listInfo: { name: string; taskCount: number } | null; recentTasks: ClickUpTask[] };
   agents: AgentMemoryRow[];
 }
 
@@ -597,7 +598,14 @@ export default function BackOffice({ onBack }: { onBack: () => void }) {
                         </div>
                         <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11 }}>
                           <span style={{ color: OR(0.35) }}>ClickUp tasks</span>
-                          <span style={{ color: "rgba(255,255,255,0.6)" }}>{a.clickupTasksCreated}</span>
+                          <span style={{ color: "rgba(255,255,255,0.6)" }}>
+                            {a.clickupTasksCreated}
+                            {a.clickupPendingCount > 0 && (
+                              <span style={{ marginLeft: 5, background: "rgba(251,146,60,0.2)", color: "#fb923c", fontSize: 9, padding: "1px 5px", borderRadius: 8 }}>
+                                {a.clickupPendingCount} pending
+                              </span>
+                            )}
+                          </span>
                         </div>
                         <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11 }}>
                           <span style={{ color: OR(0.35) }}>Last sync</span>
