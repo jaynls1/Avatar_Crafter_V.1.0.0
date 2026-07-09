@@ -5,7 +5,7 @@ import { conversations, messages } from "@workspace/db/schema";
 import { desc, eq } from "drizzle-orm";
 import { adminMiddleware } from "../middlewares/adminMiddleware";
 import { saveConversationToNotion, getAgentDbId } from "../lib/notion-memory";
-import { isClickUpConfigured, getClickUpListInfo } from "../lib/clickup-memory";
+import { isClickUpConfigured, getClickUpListInfo, getRecentClickUpTasks } from "../lib/clickup-memory";
 
 const memoryRouter = Router();
 memoryRouter.use(adminMiddleware);
@@ -26,15 +26,22 @@ memoryRouter.get("/admin/memory/status", async (req, res) => {
     AGENT_IDS.map(async (agentId) => {
       const lastSyncRows = await db.execute(
         sql`SELECT synced_at, status, error_msg FROM memory_sync_log
-            WHERE agent_id = ${agentId} ORDER BY synced_at DESC LIMIT 1`
+            WHERE agent_id = ${agentId} AND task_type = 'notion'
+            ORDER BY synced_at DESC LIMIT 1`
       ) as any;
       const lastSync = lastSyncRows.rows?.[0] ?? null;
 
       const totalRows = await db.execute(
         sql`SELECT COUNT(*)::int AS cnt FROM memory_sync_log
-            WHERE agent_id = ${agentId} AND status = 'success'`
+            WHERE agent_id = ${agentId} AND status = 'success' AND task_type = 'notion'`
       ) as any;
-      const totalSynced = totalRows.rows?.[0]?.cnt ?? 0;
+      const syncAttempts = parseInt(totalRows.rows?.[0]?.cnt ?? "0");
+
+      const clickupRows = await db.execute(
+        sql`SELECT COUNT(*)::int AS cnt FROM memory_sync_log
+            WHERE agent_id = ${agentId} AND task_type = 'clickup' AND status = 'success'`
+      ) as any;
+      const clickupTasksCreated = parseInt(clickupRows.rows?.[0]?.cnt ?? "0");
 
       const agentDbId: string | null = notionAgentMap[agentId] ?? null;
 
@@ -43,7 +50,8 @@ memoryRouter.get("/admin/memory/status", async (req, res) => {
         lastSyncedAt: lastSync?.synced_at ?? null,
         lastStatus: lastSync?.status ?? "never",
         lastError: lastSync?.error_msg ?? null,
-        totalSynced,
+        syncAttempts,
+        clickupTasksCreated,
         notionDbConfigured: !!agentDbId,
         notionDbId: agentDbId,
       };
@@ -51,6 +59,9 @@ memoryRouter.get("/admin/memory/status", async (req, res) => {
   );
 
   const clickupInfo = isClickUpConfigured() ? await getClickUpListInfo() : null;
+  const recentClickUpTasks = isClickUpConfigured()
+    ? await getRecentClickUpTasks()
+    : [];
 
   res.json({
     notion: {
@@ -61,6 +72,7 @@ memoryRouter.get("/admin/memory/status", async (req, res) => {
     clickup: {
       configured: isClickUpConfigured(),
       listInfo: clickupInfo,
+      recentTasks: recentClickUpTasks,
     },
     agents: agentRows,
   });
@@ -93,7 +105,7 @@ memoryRouter.post("/admin/memory/sync/:agentId", async (req, res) => {
     .orderBy(messages.createdAt);
 
   try {
-    const pages = await saveConversationToNotion({
+    const result = await saveConversationToNotion({
       agentId,
       title: lastConv.title,
       messages: msgs.map((m) => ({
@@ -104,16 +116,21 @@ memoryRouter.post("/admin/memory/sync/:agentId", async (req, res) => {
       conversationId: lastConv.id,
     });
 
+    if (!result.saved) {
+      res.status(400).json({ error: "Notion is not configured (no database IDs set)." });
+      return;
+    }
+
     await db.execute(
-      sql`INSERT INTO memory_sync_log (agent_id, conversation_id, notion_page_id, status)
-          VALUES (${agentId}, ${lastConv.id}, ${pages.agentPageId ?? pages.teamPageId ?? null}, 'success')`
+      sql`INSERT INTO memory_sync_log (agent_id, conversation_id, notion_page_id, status, task_type)
+          VALUES (${agentId}, ${lastConv.id}, ${result.agentPageId ?? result.teamPageId ?? null}, 'success', 'notion')`
     );
 
-    res.json({ synced: true, conversationId: lastConv.id, pages });
+    res.json({ synced: true, conversationId: lastConv.id, pages: { agentPageId: result.agentPageId, teamPageId: result.teamPageId } });
   } catch (err: any) {
     await db.execute(
-      sql`INSERT INTO memory_sync_log (agent_id, conversation_id, status, error_msg)
-          VALUES (${agentId}, ${lastConv.id}, 'error', ${String(err?.message ?? err)})`
+      sql`INSERT INTO memory_sync_log (agent_id, conversation_id, status, error_msg, task_type)
+          VALUES (${agentId}, ${lastConv.id}, 'error', ${String(err?.message ?? err)}, 'notion')`
     );
     res.status(500).json({ error: String(err?.message ?? err) });
   }
@@ -192,19 +209,25 @@ memoryRouter.post("/admin/memory/import", async (req, res) => {
 
   for (const conv of parsed) {
     try {
-      await saveConversationToNotion({
+      const result = await saveConversationToNotion({
         agentId: conv.agentId,
         title: conv.title,
         messages: conv.messages,
         conversationId: 0,
         source: "ChatGPT Export",
       });
-      await db.execute(
-        sql`INSERT INTO memory_sync_log (agent_id, conversation_id, status)
-            VALUES (${conv.agentId}, NULL, 'success')`
-      );
-      results.push({ title: conv.title, agentId: conv.agentId, status: "ok" });
-      imported++;
+
+      if (result.saved) {
+        await db.execute(
+          sql`INSERT INTO memory_sync_log (agent_id, conversation_id, notion_page_id, status, task_type)
+              VALUES (${conv.agentId}, NULL, ${result.agentPageId ?? result.teamPageId ?? null}, 'success', 'notion')`
+        );
+        results.push({ title: conv.title, agentId: conv.agentId, status: "ok" });
+        imported++;
+      } else {
+        results.push({ title: conv.title, agentId: conv.agentId, status: "skipped: Notion not configured" });
+        failed++;
+      }
     } catch (err: any) {
       results.push({
         title: conv.title,

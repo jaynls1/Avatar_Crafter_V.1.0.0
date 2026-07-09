@@ -7,6 +7,8 @@ export const memorySyncLog = pgTable("memory_sync_log", {
   agentId: text("agent_id").notNull(),
   conversationId: integer("conversation_id"),
   notionPageId: text("notion_page_id"),
+  clickupTaskId: text("clickup_task_id"),
+  taskType: text("task_type").notNull().default("notion"),
   syncedAt: timestamp("synced_at", { withTimezone: true }).defaultNow().notNull(),
   status: text("status").notNull().default("success"),
   errorMsg: text("error_msg"),

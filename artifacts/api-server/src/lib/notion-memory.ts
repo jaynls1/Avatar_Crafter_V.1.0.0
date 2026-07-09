@@ -63,57 +63,92 @@ export function getAgentDbId(agentId: string): string | null {
   }
 }
 
+async function appendBlocks(pageId: string, blocks: NotionBlock[]): Promise<void> {
+  const BATCH = 100;
+  for (let i = 0; i < blocks.length; i += BATCH) {
+    await notionRequest(`/v1/blocks/${pageId}/children`, {
+      method: "PATCH",
+      body: { children: blocks.slice(i, i + BATCH) },
+    });
+  }
+}
+
+async function createPageWithBlocks(
+  parent: { database_id: string },
+  titleText: string,
+  blocks: NotionBlock[]
+): Promise<{ id: string }> {
+  const firstBatch = blocks.slice(0, 100);
+  const rest = blocks.slice(100);
+
+  const page = await notionRequest<{ id: string }>("/v1/pages", {
+    method: "POST",
+    body: {
+      parent,
+      properties: {
+        Name: { title: [{ text: { content: titleText.slice(0, 200) } }] },
+      },
+      children: firstBatch,
+    },
+  });
+
+  if (rest.length > 0) {
+    await appendBlocks(page.id, rest);
+  }
+
+  return page;
+}
+
 export async function saveConversationToNotion(opts: {
   agentId: string;
   title: string;
   messages: Array<{ role: string; content: string; createdAt?: Date }>;
   conversationId: number;
   source?: string;
-}): Promise<{ agentPageId?: string; teamPageId?: string }> {
+}): Promise<{ agentPageId?: string; teamPageId?: string; saved: boolean }> {
   const { agentId, title, messages, conversationId, source = "NEXT HQ" } = opts;
+
+  const agentDbId = getAgentDbId(agentId);
+  const teamDbId = process.env.NOTION_TEAM_DB_ID ?? null;
+
+  if (!agentDbId && !teamDbId) {
+    return { saved: false };
+  }
 
   const summaryBlock = textBlock(
     `Agent: ${agentId} | Conversation #${conversationId} | Messages: ${messages.length} | Source: ${source}`
   );
 
   const messageBlocks: NotionBlock[] = messages.flatMap((m) => {
-    const header = textBlock(`[${m.role.toUpperCase()}]${m.createdAt ? ` — ${new Date(m.createdAt).toLocaleString()}` : ""}`);
+    const header = textBlock(
+      `[${m.role.toUpperCase()}]${m.createdAt ? ` — ${new Date(m.createdAt).toLocaleString()}` : ""}`
+    );
     const bodyChunks = chunkText(m.content).map(textBlock);
     return [header, ...bodyChunks];
   });
 
-  const allBlocks = [summaryBlock, ...messageBlocks].slice(0, 100);
+  const allBlocks = [summaryBlock, ...messageBlocks];
 
-  const result: { agentPageId?: string; teamPageId?: string } = {};
+  const result: { agentPageId?: string; teamPageId?: string; saved: boolean } = { saved: false };
 
-  const agentDbId = getAgentDbId(agentId);
   if (agentDbId) {
-    const page = await notionRequest<{ id: string }>("/v1/pages", {
-      method: "POST",
-      body: {
-        parent: { database_id: agentDbId },
-        properties: {
-          Name: { title: [{ text: { content: title.slice(0, 200) } }] },
-        },
-        children: allBlocks,
-      },
-    });
+    const page = await createPageWithBlocks(
+      { database_id: agentDbId },
+      title,
+      allBlocks
+    );
     result.agentPageId = page.id;
+    result.saved = true;
   }
 
-  const teamDbId = process.env.NOTION_TEAM_DB_ID;
   if (teamDbId) {
-    const page = await notionRequest<{ id: string }>("/v1/pages", {
-      method: "POST",
-      body: {
-        parent: { database_id: teamDbId },
-        properties: {
-          Name: { title: [{ text: { content: `[${agentId}] ${title}`.slice(0, 200) } }] },
-        },
-        children: allBlocks,
-      },
-    });
+    const page = await createPageWithBlocks(
+      { database_id: teamDbId },
+      `[${agentId}] ${title}`,
+      allBlocks
+    );
     result.teamPageId = page.id;
+    result.saved = true;
   }
 
   return result;
@@ -136,17 +171,5 @@ export async function searchNotionMemory(agentId: string, query: string): Promis
     return res.results ?? [];
   } catch {
     return [];
-  }
-}
-
-export async function countNotionEntries(dbId: string): Promise<number> {
-  try {
-    const res = await notionRequest<{ results: unknown[] }>(`/v1/databases/${dbId}/query`, {
-      method: "POST",
-      body: { page_size: 1 },
-    });
-    return (res as any).next_cursor ? 100 : (res.results?.length ?? 0);
-  } catch {
-    return 0;
   }
 }

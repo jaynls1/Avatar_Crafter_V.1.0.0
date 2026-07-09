@@ -24,7 +24,7 @@ export function scheduleNotionSync(
 
       if (!msgs.length) return;
 
-      const pages = await saveConversationToNotion({
+      const result = await saveConversationToNotion({
         agentId,
         title: conversationTitle,
         messages: msgs.map((m) => ({
@@ -35,15 +35,19 @@ export function scheduleNotionSync(
         conversationId,
       });
 
+      if (!result.saved) {
+        return;
+      }
+
       await db.execute(
-        sql`INSERT INTO memory_sync_log (agent_id, conversation_id, notion_page_id, status)
-            VALUES (${agentId}, ${conversationId}, ${pages.agentPageId ?? pages.teamPageId ?? null}, 'success')`
+        sql`INSERT INTO memory_sync_log (agent_id, conversation_id, notion_page_id, status, task_type)
+            VALUES (${agentId}, ${conversationId}, ${result.agentPageId ?? result.teamPageId ?? null}, 'success', 'notion')`
       );
     } catch (err: any) {
       try {
         await db.execute(
-          sql`INSERT INTO memory_sync_log (agent_id, conversation_id, status, error_msg)
-              VALUES (${agentId}, ${conversationId}, 'error', ${String(err?.message ?? err)})`
+          sql`INSERT INTO memory_sync_log (agent_id, conversation_id, status, error_msg, task_type)
+              VALUES (${agentId}, ${conversationId}, 'error', ${String(err?.message ?? err)}, 'notion')`
         );
       } catch {}
     }
@@ -61,7 +65,16 @@ export function scheduleClickUpScan(
 
   setImmediate(async () => {
     try {
-      await processAgentResponseForTasks({ agentId, responseText, conversationId });
+      const tasks = await processAgentResponseForTasks({ agentId, responseText, conversationId });
+
+      for (const task of tasks) {
+        if (task.clickupTaskId) {
+          await db.execute(
+            sql`INSERT INTO memory_sync_log (agent_id, conversation_id, clickup_task_id, status, task_type, error_msg)
+                VALUES (${agentId}, ${conversationId}, ${task.clickupTaskId}, 'success', 'clickup', ${task.toAgent})`
+          ).catch(() => {});
+        }
+      }
     } catch {}
   });
 }

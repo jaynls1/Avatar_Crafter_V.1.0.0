@@ -22,10 +22,17 @@ db.execute(sql`
     agent_id TEXT NOT NULL,
     conversation_id INTEGER,
     notion_page_id TEXT,
+    clickup_task_id TEXT,
+    task_type TEXT NOT NULL DEFAULT 'notion',
     synced_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
     status TEXT NOT NULL DEFAULT 'success',
     error_msg TEXT
   )
-`).catch(() => {});
+`).then(() =>
+  Promise.all([
+    db.execute(sql`ALTER TABLE memory_sync_log ADD COLUMN IF NOT EXISTS clickup_task_id TEXT`),
+    db.execute(sql`ALTER TABLE memory_sync_log ADD COLUMN IF NOT EXISTS task_type TEXT NOT NULL DEFAULT 'notion'`),
+  ])
+).catch(() => {});
 
 export default app;

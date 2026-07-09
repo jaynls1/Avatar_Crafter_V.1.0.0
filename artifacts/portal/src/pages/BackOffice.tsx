@@ -10,12 +10,13 @@ interface PromptVersion { id: number; agentId: string; content: string; active: 
 interface AgentStatus { agentId: string; lastActive: string | null; conversationCount: number; hasCustomPrompt: boolean; state: string; }
 interface AgentMemoryRow {
   agentId: string; lastSyncedAt: string | null; lastStatus: string;
-  lastError: string | null; totalSynced: number;
+  lastError: string | null; syncAttempts: number; clickupTasksCreated: number;
   notionDbConfigured: boolean; notionDbId: string | null;
 }
+interface ClickUpTask { id: string; name: string; url: string; fromAgent: string; toAgent: string; }
 interface MemoryStatus {
   notion: { configured: boolean; teamDbId: string | null; agentDbCount: number };
-  clickup: { configured: boolean; listInfo: { name: string; taskCount: number } | null };
+  clickup: { configured: boolean; listInfo: { name: string; taskCount: number } | null; recentTasks: ClickUpTask[] };
   agents: AgentMemoryRow[];
 }
 
@@ -591,8 +592,12 @@ export default function BackOffice({ onBack }: { onBack: () => void }) {
                       </div>
                       <div style={{ display: "flex", flexDirection: "column", gap: 3, marginBottom: 10 }}>
                         <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11 }}>
-                          <span style={{ color: OR(0.35) }}>Total synced</span>
-                          <span style={{ color: "rgba(255,255,255,0.6)" }}>{a.totalSynced}</span>
+                          <span style={{ color: OR(0.35) }}>Notion syncs</span>
+                          <span style={{ color: "rgba(255,255,255,0.6)" }}>{a.syncAttempts}</span>
+                        </div>
+                        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11 }}>
+                          <span style={{ color: OR(0.35) }}>ClickUp tasks</span>
+                          <span style={{ color: "rgba(255,255,255,0.6)" }}>{a.clickupTasksCreated}</span>
                         </div>
                         <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11 }}>
                           <span style={{ color: OR(0.35) }}>Last sync</span>
@@ -620,6 +625,32 @@ export default function BackOffice({ onBack }: { onBack: () => void }) {
                   )}
                 </div>
               </div>
+
+              {/* Recent ClickUp Tasks */}
+              {memoryStatus?.clickup.configured && (
+                <div>
+                  <div style={{ color: OR(0.4), fontSize: 10, letterSpacing: 2, textTransform: "uppercase", marginBottom: 12 }}>Recent Agent Tasks → ClickUp</div>
+                  {(memoryStatus.clickup.recentTasks ?? []).length === 0 ? (
+                    <div style={{ color: OR(0.2), fontSize: 12, padding: "12px 0" }}>No agent-created ClickUp tasks yet. Tasks appear here when an agent assigns work to another agent.</div>
+                  ) : (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                      {memoryStatus.clickup.recentTasks.map(t => (
+                        <a key={t.id} href={t.url} target="_blank" rel="noopener noreferrer" style={{
+                          display: "flex", justifyContent: "space-between", alignItems: "center",
+                          background: "rgba(255,255,255,0.03)", border: `1px solid ${OR(0.08)}`,
+                          borderRadius: 6, padding: "10px 14px", textDecoration: "none",
+                        }}>
+                          <div>
+                            <div style={{ color: "#fff", fontSize: 12, fontWeight: 500 }}>{t.name}</div>
+                            <div style={{ color: OR(0.4), fontSize: 10, marginTop: 2 }}>{t.fromAgent} → {t.toAgent}</div>
+                          </div>
+                          <span style={{ color: OR(0.3), fontSize: 10 }}>↗</span>
+                        </a>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
 
             </div>
           )}

@@ -80,8 +80,15 @@ export async function createClickUpTask(opts: {
           ``,
           `---`,
           opts.description,
-        ].join("\n").slice(0, 8000),
-        tags: [opts.fromAgent.toLowerCase(), opts.toAgent.toLowerCase(), "agent-task", "next-hq"],
+        ]
+          .join("\n")
+          .slice(0, 8000),
+        tags: [
+          opts.fromAgent.toLowerCase(),
+          opts.toAgent.toLowerCase(),
+          "agent-task",
+          "next-hq",
+        ],
         notify_all: false,
         custom_fields: [],
       }),
@@ -98,11 +105,11 @@ export async function processAgentResponseForTasks(opts: {
   agentId: string;
   responseText: string;
   conversationId: number;
-}): Promise<string[]> {
+}): Promise<Array<{ toAgent: string; clickupTaskId: string | null }>> {
   const directives = extractTaskDirectives(opts.responseText, opts.agentId);
   if (!directives.length) return [];
 
-  const taskIds: string[] = [];
+  const results: Array<{ toAgent: string; clickupTaskId: string | null }> = [];
   for (const d of directives) {
     const id = await createClickUpTask({
       name: `[${opts.agentId} → ${d.toAgent}] Task`,
@@ -111,9 +118,9 @@ export async function processAgentResponseForTasks(opts: {
       toAgent: d.toAgent,
       conversationId: opts.conversationId,
     });
-    if (id) taskIds.push(id);
+    results.push({ toAgent: d.toAgent, clickupTaskId: id });
   }
-  return taskIds;
+  return results;
 }
 
 export function isClickUpConfigured(): boolean {
@@ -133,5 +140,37 @@ export async function getClickUpListInfo(): Promise<{ name: string; taskCount: n
     return { name: data.name, taskCount: data.task_count ?? 0 };
   } catch {
     return null;
+  }
+}
+
+export async function getRecentClickUpTasks(agentId?: string): Promise<
+  Array<{ id: string; name: string; url: string; fromAgent: string; toAgent: string }>
+> {
+  const token = process.env.CLICKUP_API_TOKEN;
+  const listId = process.env.CLICKUP_LIST_ID;
+  if (!token || !listId) return [];
+  try {
+    const tag = agentId ? agentId.toLowerCase() : "agent-task";
+    const res = await fetch(
+      `${CLICKUP_API}/list/${listId}/task?tags[]=${encodeURIComponent(tag)}&order_by=date_created&reverse=true&page=0&limit=10`,
+      { headers: { Authorization: token } }
+    );
+    if (!res.ok) return [];
+    const data = (await res.json()) as { tasks?: Array<{ id: string; name: string; url: string; tags?: Array<{ name: string }> }> };
+    return (data.tasks ?? []).slice(0, 10).map((t) => {
+      const tagNames = (t.tags ?? []).map((tg) => tg.name);
+      const agents = tagNames.filter(
+        (n) => n !== "agent-task" && n !== "next-hq"
+      );
+      return {
+        id: t.id,
+        name: t.name,
+        url: t.url ?? `https://app.clickup.com/t/${t.id}`,
+        fromAgent: agents[0] ?? "unknown",
+        toAgent: agents[1] ?? "unknown",
+      };
+    });
+  } catch {
+    return [];
   }
 }
