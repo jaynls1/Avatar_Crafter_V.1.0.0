@@ -112,9 +112,10 @@ function canonicalProperties(opts: {
   agentId: string;
   conversationId: number;
   source: string;
+  memberId: string;
 }) {
   const now = new Date().toISOString();
-  const externalId = `${sourceOption(opts.source)}:conversation:${opts.conversationId || opts.title}`;
+  const externalId = `${sourceOption(opts.source)}:member:${opts.memberId}:conversation:${opts.conversationId || opts.title}`;
   return {
     Title: { title: [{ text: { content: opts.title.slice(0, 200) } }] },
     Source: { select: { name: sourceOption(opts.source) } },
@@ -122,6 +123,7 @@ function canonicalProperties(opts: {
     "Record Type": { select: { name: "Conversation" } },
     "External ID": { rich_text: [{ text: { content: externalId.slice(0, 2000) } }] },
     "Conversation ID": { rich_text: [{ text: { content: String(opts.conversationId) } }] },
+    "Member ID": { rich_text: [{ text: { content: opts.memberId.slice(0, 2000) } }] },
     "Captured At": { date: { start: now } },
     "Last Synced": { date: { start: now } },
     Private: { checkbox: true },
@@ -132,9 +134,10 @@ async function findCanonicalPage(
   dbId: string,
   conversationId: number,
   title: string,
-  source: string
+  source: string,
+  memberId: string
 ): Promise<string | null> {
-  const externalId = `${sourceOption(source)}:conversation:${conversationId || title}`;
+  const externalId = `${sourceOption(source)}:member:${memberId}:conversation:${conversationId || title}`;
   const data = await notionRequest<{ results?: Array<{ id: string }> }>(`/v1/databases/${dbId}/query`, {
     method: "POST",
     body: {
@@ -155,10 +158,11 @@ async function upsertCanonicalPage(opts: {
   messages: Array<{ role: string; content: string; createdAt?: Date }>;
   conversationId: number;
   source: string;
+  memberId: string;
   blocks: NotionBlock[];
 }): Promise<string> {
   const properties = canonicalProperties(opts);
-  const existingId = await findCanonicalPage(opts.dbId, opts.conversationId, opts.title, opts.source);
+  const existingId = await findCanonicalPage(opts.dbId, opts.conversationId, opts.title, opts.source, opts.memberId);
   if (existingId) {
     await notionRequest(`/v1/pages/${existingId}`, { method: "PATCH", body: { properties } });
     await replaceBlocks(existingId, opts.blocks);
@@ -200,8 +204,9 @@ export async function saveConversationToNotion(opts: {
   messages: Array<{ role: string; content: string; createdAt?: Date }>;
   conversationId: number;
   source?: string;
+  memberId: string;
 }): Promise<{ agentPageId?: string; teamPageId?: string; saved: boolean }> {
-  const { agentId, title, messages, conversationId, source = "NEXT" } = opts;
+  const { agentId, title, messages, conversationId, source = "NEXT", memberId } = opts;
   const teamDbId = getTeamDbId();
   const agentDbId = getAgentDbId(agentId);
 
@@ -222,6 +227,7 @@ export async function saveConversationToNotion(opts: {
       messages,
       conversationId,
       source,
+      memberId,
       blocks: allBlocks,
     });
     return { teamPageId, saved: true };
@@ -244,13 +250,36 @@ async function readPageText(pageId: string): Promise<string> {
     .slice(0, 12000);
 }
 
-export async function getRecentNotionMemoryText(agentId: string, limit = 3): Promise<string> {
+export async function getRecentNotionMemoryText(
+  agentId: string,
+  memberId: string | null,
+  limit = 3
+): Promise<string> {
   try {
     const dbId = getTeamDbId();
+    const visibilityFilter = memberId
+      ? {
+          or: [
+            {
+              and: [
+                { property: "Private", checkbox: { equals: true } },
+                { property: "Member ID", rich_text: { equals: memberId } },
+              ],
+            },
+            { property: "Private", checkbox: { equals: false } },
+          ],
+        }
+      : { property: "Private", checkbox: { equals: false } };
+
     const data = await notionRequest<{ results?: Array<{ id: string }> }>(`/v1/databases/${dbId}/query`, {
       method: "POST",
       body: {
-        filter: { property: "Agent", select: { equals: agentId } },
+        filter: {
+          and: [
+            { property: "Agent", select: { equals: agentId } },
+            visibilityFilter,
+          ],
+        },
         sorts: [{ property: "Last Synced", direction: "descending" }],
         page_size: Math.max(1, Math.min(limit, 5)),
       },
@@ -262,7 +291,7 @@ export async function getRecentNotionMemoryText(agentId: string, limit = 3): Pro
   }
 }
 
-export async function searchNotionMemory(agentId: string, query: string): Promise<unknown[]> {
+export async function searchNotionMemory(agentId: string, memberId: string | null, query: string): Promise<unknown[]> {
   const dbId = getTeamDbId();
   try {
     const res = await notionRequest<{ results: unknown[] }>(`/v1/databases/${dbId}/query`, {
@@ -271,6 +300,19 @@ export async function searchNotionMemory(agentId: string, query: string): Promis
         filter: {
           and: [
             { property: "Agent", select: { equals: agentId } },
+            memberId
+              ? {
+                  or: [
+                    {
+                      and: [
+                        { property: "Private", checkbox: { equals: true } },
+                        { property: "Member ID", rich_text: { equals: memberId } },
+                      ],
+                    },
+                    { property: "Private", checkbox: { equals: false } },
+                  ],
+                }
+              : { property: "Private", checkbox: { equals: false } },
             { property: "Title", title: { contains: query.slice(0, 100) } },
           ],
         },
