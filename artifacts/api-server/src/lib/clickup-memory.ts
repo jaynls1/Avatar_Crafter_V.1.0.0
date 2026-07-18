@@ -1,4 +1,5 @@
-const CLICKUP_API = "https://api.clickup.com/api/v2";\nconst DEFAULT_CLICKUP_LIST_ID = "901418228409";
+const CLICKUP_API = "https://api.clickup.com/api/v2";
+const DEFAULT_CLICKUP_LIST_ID = "901418228409";
 
 const AGENT_PATTERNS = [
   /\bTask\s+for\s+([A-Z][a-z]+)\s*:/gi,
@@ -149,8 +150,8 @@ export function isClickUpConfigured(): boolean {
 
 export async function getClickUpListInfo(): Promise<{ name: string; taskCount: number } | null> {
   const token = process.env.CLICKUP_API_TOKEN;
-  const listId = process.env.CLICKUP_LIST_ID;
-  if (!token || !listId) return null;
+  const listId = process.env.CLICKUP_LIST_ID || DEFAULT_CLICKUP_LIST_ID;
+  if (!token) return null;
   try {
     const res = await fetch(`${CLICKUP_API}/list/${listId}`, {
       headers: { Authorization: token },
