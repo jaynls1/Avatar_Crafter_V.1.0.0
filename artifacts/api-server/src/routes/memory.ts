@@ -137,6 +137,7 @@ memoryRouter.post("/admin/memory/sync/:agentId", async (req, res) => {
         createdAt: m.createdAt,
       })),
       conversationId: lastConv.id,
+      memberId: lastConv.userId ?? `admin:${req.user!.id}`,
     });
 
     if (!result.saved) {
@@ -242,6 +243,7 @@ memoryRouter.post("/admin/memory/import", async (req, res) => {
         messages: conv.messages,
         conversationId: 0,
         source: "ChatGPT Export",
+        memberId: String(req.user!.id),
       });
 
       if (result.saved) {
