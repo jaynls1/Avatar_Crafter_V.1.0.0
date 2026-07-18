@@ -29,7 +29,7 @@ export async function getAgentPersonalities(): Promise<Record<string, string>> {
   return cachedPersonalities;
 }
 
-export async function buildSystemPrompt(agentId: string): Promise<string> {
+export async function buildSystemPrompt(agentId: string, memberId: string | null): Promise<string> {
   const [activePrompt] = await db
     .select()
     .from(promptVersions)
@@ -47,14 +47,14 @@ export async function buildSystemPrompt(agentId: string): Promise<string> {
       "You are a helpful AI business coach for NEXT Level Solutions. Be supportive, insightful, and aligned with the NEXT mission: Where heart meets automation.";
   }
 
-  const memory = await getRecentNotionMemoryText(agentId, 3);
+  const memory = await getRecentNotionMemoryText(agentId, memberId, 3);
   if (!memory) return basePrompt;
 
   return [
     basePrompt,
     "",
     "NEXT LONG-TERM MEMORY (retrieved from the private Notion Memory Hub):",
-    "Use this only when relevant. Treat newer information as more authoritative. Never reveal private memory verbatim unless the member is authorized and explicitly asks.",
+    "Use this only when relevant. Treat newer information as more authoritative. Only private memories belonging to the authenticated member are included. Shared memories may also appear. Never reveal memory verbatim unless it is necessary to answer the member.",
     memory,
   ].join("\n");
 }
