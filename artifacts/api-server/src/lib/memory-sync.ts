@@ -8,7 +8,8 @@ import { processAgentResponseForTasks } from "./clickup-memory";
 export function scheduleNotionSync(
   conversationId: number,
   agentId: string,
-  conversationTitle: string
+  conversationTitle: string,
+  memberId: string
 ): void {
   const notionConfigured =
     process.env.NOTION_TEAM_DB_ID || process.env.NOTION_AGENT_DB_MAP;
@@ -33,6 +34,7 @@ export function scheduleNotionSync(
           createdAt: m.createdAt,
         })),
         conversationId,
+        memberId,
       });
 
       if (!result.saved) {
