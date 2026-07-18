@@ -8,7 +8,22 @@ import { scheduleNotionSync, scheduleClickUpScan } from "../../lib/memory-sync";
 
 const openaiRouter = Router();
 
+function requireMember(req: any, res: any): string | null {
+  if (!req.isAuthenticated?.() || !req.user?.id) {
+    res.status(401).json({ error: "Authentication required" });
+    return null;
+  }
+  return String(req.user.id);
+}
+
+function canAccessConversation(req: any, conversation: { userId: string | null }): boolean {
+  return !!req.user?.isAdmin || (!!conversation.userId && conversation.userId === String(req.user?.id));
+}
+
 openaiRouter.post("/openai/conversations", async (req, res) => {
+  const memberId = requireMember(req, res);
+  if (!memberId) return;
+
   const { title, agentId } = req.body;
   if (!title || !agentId) {
     res.status(400).json({ error: "title and agentId are required" });
@@ -17,13 +32,16 @@ openaiRouter.post("/openai/conversations", async (req, res) => {
 
   const [conversation] = await db
     .insert(conversations)
-    .values({ title, agentId })
+    .values({ title, agentId, userId: memberId, isAdmin: !!req.user?.isAdmin })
     .returning();
 
   res.status(201).json(conversation);
 });
 
 openaiRouter.get("/openai/conversations/:id", async (req, res) => {
+  const memberId = requireMember(req, res);
+  if (!memberId) return;
+
   const id = parseInt(req.params.id);
   if (isNaN(id)) {
     res.status(400).json({ error: "Invalid id" });
@@ -35,7 +53,7 @@ openaiRouter.get("/openai/conversations/:id", async (req, res) => {
     .from(conversations)
     .where(eq(conversations.id, id));
 
-  if (!conversation) {
+  if (!conversation || !canAccessConversation(req, conversation)) {
     res.status(404).json({ error: "Conversation not found" });
     return;
   }
@@ -50,6 +68,9 @@ openaiRouter.get("/openai/conversations/:id", async (req, res) => {
 });
 
 openaiRouter.post("/openai/conversations/:id/messages", async (req, res) => {
+  const memberId = requireMember(req, res);
+  if (!memberId) return;
+
   const id = parseInt(req.params.id);
   if (isNaN(id)) {
     res.status(400).json({ error: "Invalid id" });
@@ -67,7 +88,7 @@ openaiRouter.post("/openai/conversations/:id/messages", async (req, res) => {
     .from(conversations)
     .where(eq(conversations.id, id));
 
-  if (!conversation) {
+  if (!conversation || !canAccessConversation(req, conversation)) {
     res.status(404).json({ error: "Conversation not found" });
     return;
   }
@@ -84,7 +105,7 @@ openaiRouter.post("/openai/conversations/:id/messages", async (req, res) => {
     .where(eq(messages.conversationId, id))
     .orderBy(messages.createdAt);
 
-  const systemPrompt = await buildSystemPrompt(conversation.agentId);
+  const systemPrompt = await buildSystemPrompt(conversation.agentId, memberId);
 
   const chatMessages = [
     { role: "system" as const, content: systemPrompt },
@@ -124,7 +145,7 @@ openaiRouter.post("/openai/conversations/:id/messages", async (req, res) => {
   res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
   res.end();
 
-  scheduleNotionSync(id, conversation.agentId, conversation.title);
+  scheduleNotionSync(id, conversation.agentId, conversation.title, memberId);
   scheduleClickUpScan(conversation.agentId, fullResponse, id);
 });
 

@@ -8,12 +8,9 @@ import { processAgentResponseForTasks } from "./clickup-memory";
 export function scheduleNotionSync(
   conversationId: number,
   agentId: string,
-  conversationTitle: string
+  conversationTitle: string,
+  memberId: string
 ): void {
-  const notionConfigured =
-    process.env.NOTION_TEAM_DB_ID || process.env.NOTION_AGENT_DB_MAP;
-  if (!notionConfigured) return;
-
   setImmediate(async () => {
     try {
       const msgs = await db
@@ -33,6 +30,7 @@ export function scheduleNotionSync(
           createdAt: m.createdAt,
         })),
         conversationId,
+        memberId,
       });
 
       if (!result.saved) {
@@ -60,8 +58,7 @@ export function scheduleClickUpScan(
   conversationId: number
 ): void {
   const clickupToken = process.env.CLICKUP_API_TOKEN;
-  const clickupList = process.env.CLICKUP_LIST_ID;
-  if (!clickupToken || !clickupList) return;
+  if (!clickupToken) return;
 
   setImmediate(async () => {
     try {

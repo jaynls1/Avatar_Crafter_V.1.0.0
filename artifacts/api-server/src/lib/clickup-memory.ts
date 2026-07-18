@@ -1,4 +1,5 @@
 const CLICKUP_API = "https://api.clickup.com/api/v2";
+const DEFAULT_CLICKUP_LIST_ID = "901418228409";
 
 const AGENT_PATTERNS = [
   /\bTask\s+for\s+([A-Z][a-z]+)\s*:/gi,
@@ -63,7 +64,7 @@ export async function createClickUpTask(opts: {
   conversationId: number;
 }): Promise<string | null> {
   const token = process.env.CLICKUP_API_TOKEN;
-  const listId = process.env.CLICKUP_LIST_ID;
+  const listId = process.env.CLICKUP_LIST_ID || DEFAULT_CLICKUP_LIST_ID;
   if (!token || !listId) return null;
 
   const convUrl = buildConversationUrl(opts.conversationId);
@@ -144,13 +145,13 @@ export async function processAgentResponseForTasks(opts: {
 }
 
 export function isClickUpConfigured(): boolean {
-  return !!(process.env.CLICKUP_API_TOKEN && process.env.CLICKUP_LIST_ID);
+  return !!process.env.CLICKUP_API_TOKEN;
 }
 
 export async function getClickUpListInfo(): Promise<{ name: string; taskCount: number } | null> {
   const token = process.env.CLICKUP_API_TOKEN;
-  const listId = process.env.CLICKUP_LIST_ID;
-  if (!token || !listId) return null;
+  const listId = process.env.CLICKUP_LIST_ID || DEFAULT_CLICKUP_LIST_ID;
+  if (!token) return null;
   try {
     const res = await fetch(`${CLICKUP_API}/list/${listId}`, {
       headers: { Authorization: token },
@@ -173,7 +174,7 @@ type ClickUpRawTask = {
 
 async function fetchTasksByTag(tag: string): Promise<ClickUpRawTask[]> {
   const token = process.env.CLICKUP_API_TOKEN!;
-  const listId = process.env.CLICKUP_LIST_ID!;
+  const listId = process.env.CLICKUP_LIST_ID || DEFAULT_CLICKUP_LIST_ID;
   try {
     const res = await fetch(
       `${CLICKUP_API}/list/${listId}/task?tags[]=${encodeURIComponent(tag)}&order_by=date_created&reverse=true&page=0&limit=20&include_closed=true`,

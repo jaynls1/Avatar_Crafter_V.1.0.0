@@ -1,7 +1,8 @@
 import { eq, and } from "drizzle-orm";
 import { db, promptVersions } from "@workspace/db";
+import { getRecentNotionMemoryText } from "./notion-memory";
 
-const BACK_OFFICE_URL = 'https://secure-share-linkzip.replit.app';
+const BACK_OFFICE_URL = process.env.BACK_OFFICE_URL || "https://secure-share-linkzip.replit.app";
 const CACHE_TTL_MS = 60 * 60 * 1000;
 
 let cachedPersonalities: Record<string, string> | null = null;
@@ -28,22 +29,32 @@ export async function getAgentPersonalities(): Promise<Record<string, string>> {
   return cachedPersonalities;
 }
 
-export async function buildSystemPrompt(agentId: string): Promise<string> {
+export async function buildSystemPrompt(agentId: string, memberId: string | null): Promise<string> {
   const [activePrompt] = await db
     .select()
     .from(promptVersions)
     .where(and(eq(promptVersions.agentId, agentId), eq(promptVersions.active, true)))
     .limit(1);
 
+  let basePrompt: string;
   if (activePrompt) {
     promptCacheInvalidations.delete(agentId);
-    return activePrompt.content;
+    basePrompt = activePrompt.content;
+  } else {
+    const personalities = await getAgentPersonalities();
+    basePrompt =
+      personalities[agentId] ||
+      "You are a helpful AI business coach for NEXT Level Solutions. Be supportive, insightful, and aligned with the NEXT mission: Where heart meets automation.";
   }
 
-  const personalities = await getAgentPersonalities();
-  const systemPrompt = personalities[agentId];
-  if (!systemPrompt) {
-    return "You are a helpful AI business coach for NEXT Level Solutions. Be supportive, insightful, and aligned with the NEXT mission: Where heart meets automation.";
-  }
-  return systemPrompt;
+  const memory = await getRecentNotionMemoryText(agentId, memberId, 3);
+  if (!memory) return basePrompt;
+
+  return [
+    basePrompt,
+    "",
+    "NEXT LONG-TERM MEMORY (retrieved from the private Notion Memory Hub):",
+    "Use this only when relevant. Treat newer information as more authoritative. Only private memories belonging to the authenticated member are included. Shared memories may also appear. Never reveal memory verbatim unless it is necessary to answer the member.",
+    memory,
+  ].join("\n");
 }
