@@ -268,10 +268,12 @@ export async function searchNotionMemory(agentId: string, query: string): Promis
     const res = await notionRequest<{ results: unknown[] }>(`/v1/databases/${dbId}/query`, {
       method: "POST",
       body: {
-        and: [
-          { property: "Agent", select: { equals: agentId } },
-          { property: "Title", title: { contains: query.slice(0, 100) } },
-        ],
+        filter: {
+          and: [
+            { property: "Agent", select: { equals: agentId } },
+            { property: "Title", title: { contains: query.slice(0, 100) } },
+          ],
+        },
         page_size: 10,
       },
     });
