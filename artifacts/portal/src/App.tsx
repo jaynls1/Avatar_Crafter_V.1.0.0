@@ -13,10 +13,11 @@ import AboutPage from "./pages/AboutPage";
 import RookCommandCenter from "./components/RookCommandCenter";
 import BackOffice from "./pages/BackOffice";
 
-// nextNLogo, teamPhoto, novaVideo: source files not present in this environment.
-// Using null fallbacks so the app renders; swap in real assets when available.
-const nextNLogo: string | null = null;
-const teamPhoto: string | null = null;
+import nextNLogoImg from "./assets/next_n_logo.png";
+import teamPhotoImg from "./assets/team_photo.png";
+
+const nextNLogo: string = nextNLogoImg;
+const teamPhoto: string = teamPhotoImg;
 const novaVideo: string | null = null;
 
 // ── GESTURE SETS — context-aware pose sequences ────────────────────────────
@@ -710,6 +711,19 @@ function OpeningAnimation({ onComplete }: { onComplete: () => void }) {
       animation: "bgFade 5.8s ease forwards",
     }}>
 
+      {/* SVG filter: A = -R -G -B + 3 → white becomes transparent, character stays opaque */}
+      <svg width="0" height="0" style={{ position: "absolute" }}>
+        <defs>
+          <filter id="nova-white-key">
+            <feColorMatrix type="matrix"
+              values="1 0 0 0 0
+                      0 1 0 0 0
+                      0 0 1 0 0
+                     -1 -1 -1 3 0" />
+          </filter>
+        </defs>
+      </svg>
+
       {/* Warm interior light radiating from the open doorway */}
       <div style={{
         position: "absolute",
@@ -775,7 +789,7 @@ function OpeningAnimation({ onComplete }: { onComplete: () => void }) {
           objectPosition: "bottom center",
           zIndex: 5,
           opacity: phase !== "zoom" ? 1 : 0,
-          filter: `drop-shadow(0 0 32px ${OR(0.35)}) drop-shadow(0 -8px 60px rgba(255,200,120,0.25))`,
+          filter: `url(#nova-white-key) drop-shadow(0 0 32px ${OR(0.35)}) drop-shadow(0 -8px 60px rgba(255,200,120,0.25))`,
           transition: "opacity 0.5s ease, transform 0.5s ease",
           transform: phase !== "zoom" ? "translateX(-52%) translateY(0)" : "translateX(-52%) translateY(30px)",
           pointerEvents: "none",
@@ -1623,6 +1637,12 @@ function NovaLobby({ onEnterWorld, onAbout, onRook, onBackOffice, visitedAbout }
 export default function App() {
   const [screen, setScreen] = useState<Screen>("door");
   const [visitedAbout, setVisitedAbout] = useState(false);
+  const [exiting, setExiting] = useState(false);
+
+  const enterWorld = () => {
+    setExiting(true);
+    setTimeout(() => { window.location.href = "/"; }, 650);
+  };
 
   return (
     <div style={{ width: "100vw", height: "100vh", overflow: "hidden", background: "#000" }}>
@@ -1631,7 +1651,7 @@ export default function App() {
       {screen === "nova"    && <NovaGreeting onEnterLobby={() => setScreen("lobby")} />}
       {screen === "lobby"   && (
         <NovaLobby
-          onEnterWorld={() => window.location.href = "/"}
+          onEnterWorld={enterWorld}
           onAbout={() => setScreen("about")}
           onRook={() => setScreen("rook")}
           onBackOffice={() => setScreen("backoffice")}
@@ -1641,6 +1661,16 @@ export default function App() {
       {screen === "about"      && <AboutPage onBack={() => { setVisitedAbout(true); setScreen("lobby"); }} />}
       {screen === "rook"       && <RookCommandCenter onBack={() => setScreen("lobby")} />}
       {screen === "backoffice" && <BackOffice onBack={() => setScreen("lobby")} />}
+
+      {/* Full-screen black veil — fades in before any hard navigation to prevent white flash */}
+      <div style={{
+        position: "fixed", inset: 0,
+        background: "#000",
+        opacity: exiting ? 1 : 0,
+        transition: "opacity 0.6s ease",
+        pointerEvents: exiting ? "all" : "none",
+        zIndex: 9999,
+      }} />
     </div>
   );
 }

@@ -13,14 +13,17 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, "");
 
 createRoot(document.getElementById("root")!).render(
   <Router base={base}>
-    <Switch>
-      <Route path="/admin" component={AdminPage} />
-      <Route path="/camera" component={CameraPage} />
-      <Route path="/theatre" component={TheatrePage} />
-      <Route path="/hallway/:side" component={HallwayPage} />
-      <Route path="/atlas" component={AtlasOfficePage} />
-      <Route path="/office/:id" component={OfficePage} />
-      <Route component={App} />
-    </Switch>
+    {/* Dark wrapper prevents white flash between route transitions */}
+    <div style={{ width: "100vw", height: "100vh", background: "#06040e", overflow: "hidden" }}>
+      <Switch>
+        <Route path="/admin" component={AdminPage} />
+        <Route path="/camera" component={CameraPage} />
+        <Route path="/theatre" component={TheatrePage} />
+        <Route path="/hallway/:side" component={HallwayPage} />
+        <Route path="/atlas" component={AtlasOfficePage} />
+        <Route path="/office/:id" component={OfficePage} />
+        <Route component={App} />
+      </Switch>
+    </div>
   </Router>
 );

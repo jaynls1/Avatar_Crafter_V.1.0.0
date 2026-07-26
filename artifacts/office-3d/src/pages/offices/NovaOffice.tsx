@@ -221,7 +221,7 @@ export default function NovaOffice() {
   const [, navigate] = useLocation();
   return (
     <div style={{ width: "100vw", height: "100vh", background: "#04080e" }}>
-      <Canvas shadows camera={{ position: [0, 3, 6.5], fov: 62, near: 0.1, far: 80 }} gl={{ antialias: true, alpha: false }}>
+      <Canvas shadows camera={{ position: [0, 3, 6.5], fov: 62, near: 0.1, far: 80 }} gl={{ antialias: true, alpha: false }} style={{ background: "#04080e" }}>
         <Suspense fallback={null}>
           <ambientLight intensity={0.2} color="#1040a0" />
           <NovaRoom />
