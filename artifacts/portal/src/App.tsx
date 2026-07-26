@@ -1037,7 +1037,7 @@ function NovaGreeting({ onEnterLobby }: { onEnterLobby: () => void }) {
 
       {/* Nova character panel */}
       <div style={{
-        width: "42%", position: "relative",
+        width: "36%", position: "relative",
         display: "flex", alignItems: "flex-end", justifyContent: "center",
         flexShrink: 0, paddingTop: 60, overflow: "hidden",
       }}>
@@ -1054,11 +1054,11 @@ function NovaGreeting({ onEnterLobby }: { onEnterLobby: () => void }) {
           src={novaFrontImg}
           alt="Nova"
           style={{
-            height: "88vh",
+            height: "70vh",
             objectFit: "contain",
             objectPosition: "bottom center",
             position: "absolute",
-            bottom: 0,
+            bottom: -24,
             zIndex: 1,
             filter: `drop-shadow(0 0 40px ${OR(0.22)})`,
             animation: "novaIn 0.9s cubic-bezier(0.16,1,0.3,1) forwards",
@@ -1074,11 +1074,11 @@ function NovaGreeting({ onEnterLobby }: { onEnterLobby: () => void }) {
             src={src}
             alt=""
             style={{
-              height: "88vh",
+              height: "70vh",
               objectFit: "contain",
               objectPosition: "bottom center",
               position: "absolute",
-              bottom: 0,
+              bottom: -24,
               zIndex: 2,
               filter: `drop-shadow(0 0 48px ${OR(0.4)})`,
               opacity: i === poseIdx % GESTURE_SETS[gestureSet].length ? 1 : 0,
