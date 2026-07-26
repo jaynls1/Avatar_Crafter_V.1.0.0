@@ -21,6 +21,8 @@ interface InteractionPanelProps {
 export function InteractionPanel({
   agent,
   onClose,
+  onStartSpeaking,
+  onStopSpeaking,
   activeSpecialtyFilter,
   onSpecialtyFilter,
 }: InteractionPanelProps) {
@@ -155,6 +157,15 @@ export function InteractionPanel({
       });
     }
   }, [agent]);
+
+  // Drive the 3D speak-pose animation from real streaming state
+  useEffect(() => {
+    if (isStreaming) {
+      onStartSpeaking();
+    } else {
+      onStopSpeaking();
+    }
+  }, [isStreaming]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
