@@ -250,6 +250,7 @@ async function readPageText(pageId: string): Promise<string> {
     .slice(0, 12000);
 }
 
+/** Recency-based: returns the N most recently synced conversations for this agent/member. */
 export async function getRecentNotionMemoryText(
   agentId: string,
   memberId: string | null,
@@ -285,6 +286,78 @@ export async function getRecentNotionMemoryText(
       },
     });
     const memories = await Promise.all((data.results ?? []).map((page) => readPageText(page.id)));
+    return memories.filter(Boolean).join("\n\n---\n\n").slice(0, 24000);
+  } catch {
+    return "";
+  }
+}
+
+/**
+ * Relevance-based: combines keyword search (by userMessage) with recency fallback.
+ * Keyword-matched pages appear first; remaining slots filled by recency.
+ * Deduplicates by page ID. Returns up to `limit` excerpts.
+ */
+export async function getRelevantNotionMemoryText(
+  agentId: string,
+  memberId: string | null,
+  userMessage: string,
+  limit = 3
+): Promise<string> {
+  try {
+    const dbId = getTeamDbId();
+    const visibilityFilter = memberId
+      ? {
+          or: [
+            {
+              and: [
+                { property: "Private", checkbox: { equals: true } },
+                { property: "Member ID", rich_text: { equals: memberId } },
+              ],
+            },
+            { property: "Private", checkbox: { equals: false } },
+          ],
+        }
+      : { property: "Private", checkbox: { equals: false } };
+
+    const agentFilter = { property: "Agent", select: { equals: agentId } };
+
+    // Extract a short keyword phrase from the message for Notion title search
+    const keyword = userMessage.trim().slice(0, 100);
+
+    // Run keyword search and recency fetch in parallel
+    const [keywordData, recentData] = await Promise.all([
+      keyword
+        ? notionRequest<{ results?: Array<{ id: string }> }>(`/v1/databases/${dbId}/query`, {
+            method: "POST",
+            body: {
+              filter: { and: [agentFilter, visibilityFilter, { property: "Title", title: { contains: keyword } }] },
+              page_size: limit,
+            },
+          }).catch(() => ({ results: [] as Array<{ id: string }> }))
+        : Promise.resolve({ results: [] as Array<{ id: string }> }),
+      notionRequest<{ results?: Array<{ id: string }> }>(`/v1/databases/${dbId}/query`, {
+        method: "POST",
+        body: {
+          filter: { and: [agentFilter, visibilityFilter] },
+          sorts: [{ property: "Last Synced", direction: "descending" }],
+          page_size: limit + 2, // fetch a few extra for dedup headroom
+        },
+      }).catch(() => ({ results: [] as Array<{ id: string }> })),
+    ]);
+
+    // Merge: keyword results first, then recency, deduplicated by page ID
+    const seen = new Set<string>();
+    const pages: Array<{ id: string }> = [];
+    for (const page of [...(keywordData.results ?? []), ...(recentData.results ?? [])]) {
+      if (!seen.has(page.id) && pages.length < limit) {
+        seen.add(page.id);
+        pages.push(page);
+      }
+    }
+
+    if (pages.length === 0) return "";
+
+    const memories = await Promise.all(pages.map((page) => readPageText(page.id)));
     return memories.filter(Boolean).join("\n\n---\n\n").slice(0, 24000);
   } catch {
     return "";

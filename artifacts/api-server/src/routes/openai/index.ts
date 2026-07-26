@@ -105,7 +105,7 @@ openaiRouter.post("/openai/conversations/:id/messages", async (req, res) => {
     .where(eq(messages.conversationId, id))
     .orderBy(messages.createdAt);
 
-  const systemPrompt = await buildSystemPrompt(conversation.agentId, memberId);
+  const systemPrompt = await buildSystemPrompt(conversation.agentId, memberId, content);
 
   const chatMessages = [
     { role: "system" as const, content: systemPrompt },

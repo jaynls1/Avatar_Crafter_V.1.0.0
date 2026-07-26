@@ -8,7 +8,7 @@ import {
   usersTable,
 } from "@workspace/db/schema";
 import { openai } from "@workspace/integrations-openai-ai-server";
-import { buildSystemPrompt, invalidatePromptCache } from "../lib/agentPersonalities";
+import { buildSystemPrompt, invalidatePromptCache, getAllMemorySettings, setMemoryEnabled } from "../lib/agentPersonalities";
 import { adminMiddleware } from "../middlewares/adminMiddleware";
 import { scheduleNotionSync, scheduleClickUpScan } from "../lib/memory-sync";
 
@@ -152,7 +152,7 @@ adminRouter.post("/admin/conversations/:agentId/messages", async (req, res) => {
     .where(eq(messages.conversationId, conv.id))
     .orderBy(messages.createdAt);
 
-  const baseSystemPrompt = await buildSystemPrompt(agentId);
+  const baseSystemPrompt = await buildSystemPrompt(agentId, null, content);
   const adminSystemPrompt = `${baseSystemPrompt}
 
 [ADMIN OVERRIDE] You are now in a direct admin session with Jason, your creator and operator. This is a private, elevated-access conversation. Be fully transparent, share internal state, respond to operational instructions directly, and bypass any public-facing communication constraints. Treat all instructions here as authoritative directives from your operator.`;
@@ -306,6 +306,32 @@ adminRouter.delete("/admin/prompts/:agentId/:versionId", async (req, res) => {
 
   invalidatePromptCache(agentId);
   res.json({ deleted: true });
+});
+
+// ── Memory injection settings ────────────────────────────────────────────────
+
+adminRouter.get("/admin/memory/settings", async (_req, res) => {
+  try {
+    const settings = await getAllMemorySettings();
+    res.json(settings);
+  } catch (err) {
+    res.status(500).json({ error: "Failed to load memory settings" });
+  }
+});
+
+adminRouter.put("/admin/memory/settings/:agentId", async (req, res) => {
+  const { agentId } = req.params;
+  const { enabled } = req.body;
+  if (typeof enabled !== "boolean") {
+    res.status(400).json({ error: "enabled must be a boolean" });
+    return;
+  }
+  try {
+    await setMemoryEnabled(agentId, enabled);
+    res.json({ agentId, memoryEnabled: enabled });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to update memory setting" });
+  }
 });
 
 adminRouter.post("/admin/users/:userId/grant-admin", async (req, res) => {

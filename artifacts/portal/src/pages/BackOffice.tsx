@@ -48,6 +48,10 @@ export default function BackOffice({ onBack }: { onBack: () => void }) {
   const [importResult, setImportResult] = useState<string | null>(null);
   const importFileRef = useRef<HTMLInputElement>(null);
 
+  // Memory injection ON/OFF per agent (default true = enabled)
+  const [memorySettings, setMemorySettings] = useState<Record<string, boolean>>({});
+  const [togglingAgent, setTogglingAgent] = useState<string | null>(null);
+
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -210,13 +214,33 @@ export default function BackOffice({ onBack }: { onBack: () => void }) {
   async function loadMemoryStatus() {
     setMemoryLoading(true);
     try {
-      const res = await fetch("/api/admin/memory/status", { credentials: "include" });
-      setMemoryStatus(await res.json());
+      const [statusRes, settingsRes] = await Promise.all([
+        fetch("/api/admin/memory/status", { credentials: "include" }),
+        fetch("/api/admin/memory/settings", { credentials: "include" }),
+      ]);
+      setMemoryStatus(await statusRes.json());
+      if (settingsRes.ok) setMemorySettings(await settingsRes.json());
     } catch {
       setMemoryStatus(null);
     } finally {
       setMemoryLoading(false);
     }
+  }
+
+  async function toggleMemory(agentId: string, enabled: boolean) {
+    setTogglingAgent(agentId);
+    try {
+      const res = await fetch(`/api/admin/memory/settings/${agentId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ enabled }),
+      });
+      if (res.ok) {
+        setMemorySettings(prev => ({ ...prev, [agentId]: enabled }));
+      }
+    } catch {}
+    finally { setTogglingAgent(null); }
   }
 
   async function syncAgent(agentId: string) {
@@ -614,6 +638,27 @@ export default function BackOffice({ onBack }: { onBack: () => void }) {
                         {a.lastError && (
                           <div style={{ color: "#ef4444", fontSize: 10, lineHeight: 1.3, marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={a.lastError}>{a.lastError}</div>
                         )}
+                      </div>
+                      {/* Memory injection toggle */}
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                        <span style={{ color: OR(0.4), fontSize: 11 }}>Memory injection</span>
+                        <button
+                          onClick={() => toggleMemory(a.agentId, !(memorySettings[a.agentId] ?? true))}
+                          disabled={togglingAgent === a.agentId}
+                          title={(memorySettings[a.agentId] ?? true) ? "Click to disable memory recall for this agent" : "Click to enable memory recall for this agent"}
+                          style={{
+                            padding: "2px 10px",
+                            borderRadius: 12,
+                            border: `1px solid ${(memorySettings[a.agentId] ?? true) ? "rgba(34,197,94,0.5)" : OR(0.25)}`,
+                            background: (memorySettings[a.agentId] ?? true) ? "rgba(34,197,94,0.12)" : OR(0.08),
+                            color: (memorySettings[a.agentId] ?? true) ? "#22c55e" : OR(0.4),
+                            fontSize: 10, fontWeight: 600, cursor: "pointer",
+                            transition: "all 0.2s",
+                            opacity: togglingAgent === a.agentId ? 0.5 : 1,
+                          }}
+                        >
+                          {(memorySettings[a.agentId] ?? true) ? "● ON" : "○ OFF"}
+                        </button>
                       </div>
                       <button
                         onClick={() => syncAgent(a.agentId)}
