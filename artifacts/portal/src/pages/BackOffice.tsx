@@ -503,25 +503,25 @@ export default function BackOffice({ onBack }: { onBack: () => void }) {
                     <span style={{ color: "#fff", fontWeight: 600, fontSize: 13 }}>Notion</span>
                     <span style={{
                       fontSize: 10, padding: "2px 8px", borderRadius: 12,
-                      background: memoryStatus?.notion.configured ? "rgba(34,197,94,0.12)" : OR(0.08),
-                      color: memoryStatus?.notion.configured ? "#22c55e" : OR(0.4),
-                    }}>{memoryStatus?.notion.configured ? "● Connected" : "Not configured"}</span>
+                      background: memoryStatus?.notion?.configured ? "rgba(34,197,94,0.12)" : OR(0.08),
+                      color: memoryStatus?.notion?.configured ? "#22c55e" : OR(0.4),
+                    }}>{memoryStatus?.notion?.configured ? "● Connected" : "Not configured"}</span>
                   </div>
-                  {!memoryStatus?.notion.configured && (
+                  {!memoryStatus?.notion?.configured && (
                     <div style={{ color: OR(0.4), fontSize: 11, lineHeight: 1.5 }}>
                       Set <code style={{ background: OR(0.08), padding: "1px 5px", borderRadius: 3, color: O }}>NOTION_TEAM_DB_ID</code> in Secrets to activate.
                       <br />Optionally add <code style={{ background: OR(0.08), padding: "1px 5px", borderRadius: 3, color: O }}>NOTION_AGENT_DB_MAP</code> as a JSON map of agentId → database ID for per-agent databases.
                     </div>
                   )}
-                  {memoryStatus?.notion.configured && (
+                  {memoryStatus?.notion?.configured && (
                     <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                       <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11 }}>
                         <span style={{ color: OR(0.35) }}>Team DB</span>
-                        <span style={{ color: "rgba(255,255,255,0.5)", fontFamily: "monospace", fontSize: 10 }}>{memoryStatus.notion.teamDbId?.slice(0, 8) ?? "—"}…</span>
+                        <span style={{ color: "rgba(255,255,255,0.5)", fontFamily: "monospace", fontSize: 10 }}>{memoryStatus.notion?.teamDbId?.slice(0, 8) ?? "—"}…</span>
                       </div>
                       <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11 }}>
                         <span style={{ color: OR(0.35) }}>Agent DBs</span>
-                        <span style={{ color: "rgba(255,255,255,0.6)" }}>{memoryStatus.notion.agentDbCount} configured</span>
+                        <span style={{ color: "rgba(255,255,255,0.6)" }}>{memoryStatus.notion?.agentDbCount} configured</span>
                       </div>
                     </div>
                   )}
@@ -578,13 +578,13 @@ export default function BackOffice({ onBack }: { onBack: () => void }) {
                     accept=".json"
                     style={{ color: OR(0.6), fontSize: 12, flex: 1 }}
                   />
-                  <button onClick={handleImport} disabled={importing || !memoryStatus?.notion.configured} style={{
+                  <button onClick={handleImport} disabled={importing || !memoryStatus?.notion?.configured} style={{
                     background: importing ? OR(0.15) : `linear-gradient(135deg,${O},#ea580c)`,
                     border: "none", borderRadius: 6, color: "#fff", padding: "8px 16px",
                     cursor: importing ? "not-allowed" : "pointer", fontSize: 12, fontWeight: 600, whiteSpace: "nowrap",
                   }}>{importing ? "Importing..." : "⬆ Import to Notion"}</button>
                 </div>
-                {!memoryStatus?.notion.configured && (
+                {!memoryStatus?.notion?.configured && (
                   <div style={{ marginTop: 8, color: OR(0.4), fontSize: 11 }}>Configure Notion first to enable import.</div>
                 )}
                 {importResult && (
@@ -662,7 +662,7 @@ export default function BackOffice({ onBack }: { onBack: () => void }) {
                       </div>
                       <button
                         onClick={() => syncAgent(a.agentId)}
-                        disabled={!!syncingAgent || !memoryStatus?.notion.configured}
+                        disabled={!!syncingAgent || !memoryStatus?.notion?.configured}
                         style={{
                           width: "100%", background: "transparent",
                           border: `1px solid ${OR(0.2)}`, borderRadius: 5,
