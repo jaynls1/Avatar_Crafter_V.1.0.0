@@ -179,6 +179,79 @@ function autoPosition(key: string): [number, number, number] {
  */
 const HIDDEN_FROM_WORLD = new Set(["rook"]);
 
+// ─── Open Lobby Layout ────────────────────────────────────────────────────────
+// Nova has a permanent greeter position in the lobby.
+// Up to 2 visiting agents rotate through the visitor slots based on time-of-day.
+
+const NOVA_LOBBY_POSITION: [number, number, number] = [0, 0, 2];
+
+const LOBBY_VISITOR_SLOTS: [number, number, number][] = [
+  [-4.5, 0,  0.5],   // slot 0 — left, near lounge seating
+  [ 5.5, 0, -1.5],   // slot 1 — right side of lobby
+  [-2.0, 0, -5.5],   // slot 2 — back centre, near hallway entrance
+];
+
+/**
+ * Per-hour lobby roster — who visits the lobby alongside Nova.
+ * Index = local hour (0–23). Max 2 visitors per slot.
+ */
+const LOBBY_SCHEDULE: string[][] = [
+  /* 00 */ ["haven"],
+  /* 01 */ ["scribe"],
+  /* 02 */ ["scribe"],
+  /* 03 */ ["haven"],
+  /* 04 */ ["atlas"],
+  /* 05 */ ["atlas"],
+  /* 06 */ ["meme",   "anchor"],
+  /* 07 */ ["meme",   "anchor"],
+  /* 08 */ ["atlas",  "sniper"],
+  /* 09 */ ["atlas",  "sniper"],
+  /* 10 */ ["ignite", "meme"],
+  /* 11 */ ["ignite", "index"],
+  /* 12 */ ["atlas",  "scribe"],
+  /* 13 */ ["sniper", "anchor"],
+  /* 14 */ ["atlas",  "haven"],
+  /* 15 */ ["ignite", "index"],
+  /* 16 */ ["meme",   "legion"],
+  /* 17 */ ["meme",   "legion"],
+  /* 18 */ ["scribe", "haven"],
+  /* 19 */ ["atlas",  "scribe"],
+  /* 20 */ ["index",  "scribe"],
+  /* 21 */ ["haven"],
+  /* 22 */ ["haven"],
+  /* 23 */ ["scribe"],
+];
+
+/**
+ * Returns agents currently in the lobby, with positions overridden to
+ * their lobby slots. Nova is always first; visitors follow in slot order.
+ */
+export function getLobbyAgents(agents: Agent[], hour: number): Agent[] {
+  const scheduled = LOBBY_SCHEDULE[Math.min(Math.max(0, hour), 23)] ?? [];
+  const lobbyIds  = new Set(["nova", ...scheduled]);
+  const result: Agent[] = [];
+  let slot = 0;
+
+  // Keep agents in the order they come from the API so Nova always leads
+  for (const agent of agents) {
+    if (!lobbyIds.has(agent.id)) continue;
+    if (agent.id === "nova") {
+      result.push({ ...agent, position: NOVA_LOBBY_POSITION });
+    } else {
+      const pos = LOBBY_VISITOR_SLOTS[slot] ?? LOBBY_VISITOR_SLOTS[0];
+      result.push({ ...agent, position: [...pos] as [number, number, number] });
+      slot++;
+    }
+  }
+  return result;
+}
+
+/** Returns the set of agent IDs currently scheduled in the lobby. */
+export function getLobbyAgentIds(hour: number): Set<string> {
+  const scheduled = LOBBY_SCHEDULE[Math.min(Math.max(0, hour), 23)] ?? [];
+  return new Set(["nova", ...scheduled]);
+}
+
 const FALLBACK_META: Omit<LocalMeta, "position"> = {
   specialty: "Agent",
   personality: "Professional, focused, helpful",

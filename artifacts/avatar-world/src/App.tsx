@@ -1,9 +1,8 @@
-import { useState, useCallback, useEffect } from "react";
-import { Agent, fetchAgents } from "./agents";
+import { useState, useCallback, useEffect, useMemo } from "react";
+import { Agent, fetchAgents, getLobbyAgents, getLobbyAgentIds } from "./agents";
 import { Scene3D } from "./components/Scene3D";
 import { InteractionPanel } from "./components/InteractionPanel";
 import { AgentSelector } from "./components/AgentSelector";
-import { AgentIntroCard } from "./components/AgentIntroCard";
 import { WebGLFallback } from "./components/WebGLFallback";
 import { Walkthrough } from "./components/Walkthrough";
 import { useAuth } from "@workspace/replit-auth-web";
@@ -51,14 +50,7 @@ function SpecialtyFilterBanner({
       <span style={{ fontSize: 12, color: "rgba(255,255,255,0.5)", letterSpacing: 0.5 }}>
         Filtering by:
       </span>
-      <span
-        style={{
-          fontSize: 13,
-          fontWeight: 700,
-          color: "#A78BFA",
-          letterSpacing: 0.3,
-        }}
-      >
+      <span style={{ fontSize: 13, fontWeight: 700, color: "#A78BFA", letterSpacing: 0.3 }}>
         {specialty}
       </span>
       <button
@@ -94,7 +86,13 @@ function SpecialtyFilterBanner({
   );
 }
 
-function HUD({ agentCount, pagedAgentName }: { agentCount: number; pagedAgentName: string | null }) {
+function HUD({
+  agentCount,
+  lobbyCount,
+}: {
+  agentCount: number;
+  lobbyCount: number;
+}) {
   const { user, isAuthenticated, isLoading, login, logout } = useAuth();
 
   return (
@@ -118,33 +116,27 @@ function HUD({ agentCount, pagedAgentName }: { agentCount: number; pagedAgentNam
       }}
     >
       <div style={{ color: "#A78BFA", fontWeight: 700, fontSize: 15, letterSpacing: 1, pointerEvents: "none" }}>
-        ◈ AGENT WORLD
+        ◈ AGENT LOBBY
       </div>
       <div style={{ width: 1, height: 20, background: "rgba(255,255,255,0.15)" }} />
-      {pagedAgentName ? (
-        <div style={{ display: "flex", alignItems: "center", gap: 6, pointerEvents: "none" }}>
-          <div
-            style={{
-              width: 7,
-              height: 7,
-              borderRadius: "50%",
-              background: "#10B981",
-              boxShadow: "0 0 8px #10B981",
-              animation: "hudPulse 1s ease-in-out infinite",
-            }}
-          />
-          <span style={{ color: "#10B981", fontSize: 12, fontWeight: 600 }}>
-            {pagedAgentName} on stage
-          </span>
-        </div>
-      ) : (
-        <div style={{ color: "rgba(255,255,255,0.5)", fontSize: 12, pointerEvents: "none" }}>
-          {agentCount} Agents Active
-        </div>
-      )}
+      <div style={{ display: "flex", alignItems: "center", gap: 6, pointerEvents: "none" }}>
+        <div
+          style={{
+            width: 7,
+            height: 7,
+            borderRadius: "50%",
+            background: "#10B981",
+            boxShadow: "0 0 8px #10B981",
+            animation: "hudPulse 2s ease-in-out infinite",
+          }}
+        />
+        <span style={{ color: "rgba(255,255,255,0.6)", fontSize: 12 }}>
+          {lobbyCount} in lobby · {agentCount - lobbyCount} in offices
+        </span>
+      </div>
       <div style={{ width: 1, height: 20, background: "rgba(255,255,255,0.15)" }} />
       <div style={{ color: "rgba(255,255,255,0.4)", fontSize: 11, pointerEvents: "none" }}>
-        {pagedAgentName ? "Click agent to chat" : "📡 Page · 💬 Chat · 🖱️ Explore"}
+        💬 Click to chat · 🖱️ Drag to explore
       </div>
       <div style={{ width: 1, height: 20, background: "rgba(255,255,255,0.15)" }} />
       {!isLoading && (
@@ -196,30 +188,29 @@ function HUD({ agentCount, pagedAgentName }: { agentCount: number; pagedAgentNam
       <style>{`
         @keyframes hudPulse {
           0%, 100% { opacity: 1; transform: scale(1); }
-          50% { opacity: 0.5; transform: scale(1.4); }
+          50%       { opacity: 0.5; transform: scale(1.4); }
         }
       `}</style>
     </div>
   );
 }
 
-const urlParams = new URLSearchParams(window.location.search);
-const EMBED_MODE = urlParams.get("mode") === "embed";
+const urlParams    = new URLSearchParams(window.location.search);
+const EMBED_MODE   = urlParams.get("mode") === "embed";
 const EMBED_AGENT_ID = urlParams.get("agent") ?? null;
 
 export default function App() {
-  const [agents, setAgents] = useState<Agent[]>([]);
+  const [agents, setAgents]             = useState<Agent[]>([]);
   const [agentsLoading, setAgentsLoading] = useState(true);
-  const [agentsError, setAgentsError] = useState<string | null>(null);
-
+  const [agentsError, setAgentsError]   = useState<string | null>(null);
   const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null);
-  const [pagedAgentId, setPagedAgentId] = useState<string | null>(
-    EMBED_MODE && EMBED_AGENT_ID ? EMBED_AGENT_ID : null
-  );
   const [speakingAgentId, setSpeakingAgentId] = useState<string | null>(null);
   const [highlightedSpecialty, setHighlightedSpecialty] = useState<string | null>(null);
   const [webGLAvailable, setWebGLAvailable] = useState<boolean | null>(null);
   const [showWalkthrough, setShowWalkthrough] = useState(!EMBED_MODE);
+
+  // Track current hour so the lobby roster updates when the clock rolls over
+  const [currentHour, setCurrentHour] = useState(new Date().getHours());
 
   useEffect(() => {
     setWebGLAvailable(detectWebGL());
@@ -228,76 +219,58 @@ export default function App() {
       if (seen) setShowWalkthrough(false);
     }
     fetchAgents()
-      .then((data) => {
-        setAgents(data);
-        setAgentsLoading(false);
-      })
-      .catch((err) => {
+      .then((data) => { setAgents(data); setAgentsLoading(false); })
+      .catch((err)  => {
         console.error("Failed to load agents:", err);
         setAgentsError("Could not load agents. Please refresh.");
         setAgentsLoading(false);
       });
+
+    // Update lobby roster when the hour rolls over
+    const tick = setInterval(() => {
+      setCurrentHour(new Date().getHours());
+    }, 60_000);
+    return () => clearInterval(tick);
   }, []);
+
+  // Agents currently in the open lobby (Nova + scheduled visitors)
+  const lobbyAgents = useMemo(
+    () => getLobbyAgents(agents, currentHour),
+    [agents, currentHour]
+  );
+
+  // Set of IDs in lobby — used by AgentSelector for "in lobby" badges
+  const lobbyAgentIds = useMemo(
+    () => getLobbyAgentIds(currentHour),
+    [currentHour]
+  );
+
+  // Embed mode: honour ?agent= param pre-select
+  const embedInitAgent = EMBED_MODE && EMBED_AGENT_ID
+    ? agents.find((a) => a.id === EMBED_AGENT_ID) ?? null
+    : null;
 
   const handleWalkthroughComplete = useCallback(() => {
     setShowWalkthrough(false);
     localStorage.setItem("agentworld-tour-done", "1");
   }, []);
 
-  const handleSelectAgent = useCallback((agent: Agent) => {
-    setSelectedAgent(agent);
-  }, []);
-
-  const handlePageAgent = useCallback((agentId: string | null) => {
-    setPagedAgentId(agentId);
-  }, []);
-
+  const handleSelectAgent  = useCallback((agent: Agent) => setSelectedAgent(agent), []);
   const handleStartSpeaking = useCallback(() => {
     if (selectedAgent) setSpeakingAgentId(selectedAgent.id);
   }, [selectedAgent]);
-
-  const handleStopSpeaking = useCallback(() => {
-    setSpeakingAgentId(null);
-  }, []);
-
+  const handleStopSpeaking  = useCallback(() => setSpeakingAgentId(null), []);
   const handleClose = useCallback(() => {
     setSelectedAgent(null);
     setSpeakingAgentId(null);
   }, []);
 
-  const handleIntroChat = useCallback((agent: Agent) => {
-    setSelectedAgent(agent);
-  }, []);
-
-  const handleIntroStandDown = useCallback(() => {
-    setPagedAgentId(null);
-  }, []);
-
+  // ── Loading / error screens ──────────────────────────────────────────────────
   if (webGLAvailable === null || agentsLoading) {
     return (
-      <div
-        style={{
-          width: "100vw",
-          height: "100vh",
-          background: "#060c14",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          fontFamily: "'Inter', sans-serif",
-        }}
-      >
+      <div style={{ width: "100vw", height: "100vh", background: "#060c14", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Inter', sans-serif" }}>
         <div style={{ textAlign: "center" }}>
-          <div
-            style={{
-              width: 40,
-              height: 40,
-              border: "3px solid rgba(249,115,22,0.2)",
-              borderTop: "3px solid #F97316",
-              borderRadius: "50%",
-              margin: "0 auto 16px",
-              animation: "spin 0.8s linear infinite",
-            }}
-          />
+          <div style={{ width: 40, height: 40, border: "3px solid rgba(249,115,22,0.2)", borderTop: "3px solid #F97316", borderRadius: "50%", margin: "0 auto 16px", animation: "spin 0.8s linear infinite" }} />
           <div style={{ color: "rgba(255,255,255,0.4)", fontSize: 13 }}>Loading agents…</div>
         </div>
         <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
@@ -307,33 +280,11 @@ export default function App() {
 
   if (agentsError) {
     return (
-      <div
-        style={{
-          width: "100vw",
-          height: "100vh",
-          background: "#060c14",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          fontFamily: "'Inter', sans-serif",
-        }}
-      >
+      <div style={{ width: "100vw", height: "100vh", background: "#060c14", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Inter', sans-serif" }}>
         <div style={{ textAlign: "center", maxWidth: 360 }}>
           <div style={{ fontSize: 36, marginBottom: 12 }}>⚠️</div>
           <div style={{ color: "rgba(255,255,255,0.8)", fontSize: 14, marginBottom: 16 }}>{agentsError}</div>
-          <button
-            onClick={() => window.location.reload()}
-            style={{
-              background: "rgba(249,115,22,0.15)",
-              border: "1px solid rgba(249,115,22,0.4)",
-              borderRadius: 8,
-              color: "#F97316",
-              fontSize: 13,
-              fontWeight: 600,
-              padding: "8px 20px",
-              cursor: "pointer",
-            }}
-          >
+          <button onClick={() => window.location.reload()} style={{ background: "rgba(249,115,22,0.15)", border: "1px solid rgba(249,115,22,0.4)", borderRadius: 8, color: "#F97316", fontSize: 13, fontWeight: 600, padding: "8px 20px", cursor: "pointer" }}>
             Retry
           </button>
         </div>
@@ -341,23 +292,17 @@ export default function App() {
     );
   }
 
-  const pagedAgent = pagedAgentId
-    ? agents.find((a) => a.id === pagedAgentId) ?? null
-    : null;
-
+  // ── WebGL fallback ───────────────────────────────────────────────────────────
   if (!webGLAvailable) {
     return (
       <div style={{ width: "100vw", height: "100vh", overflow: "hidden", background: "#010108", position: "relative" }}>
         {showWalkthrough && <Walkthrough onComplete={handleWalkthroughComplete} />}
-        <HUD agentCount={agents.length} pagedAgentName={null} />
+        <HUD agentCount={agents.length} lobbyCount={lobbyAgents.length} />
         <div style={{ paddingTop: 70, height: "100%" }}>
           <WebGLFallback agents={agents} selectedAgent={selectedAgent} onSelect={handleSelectAgent} />
         </div>
         {highlightedSpecialty && (
-          <SpecialtyFilterBanner
-            specialty={highlightedSpecialty}
-            onClear={() => setHighlightedSpecialty(null)}
-          />
+          <SpecialtyFilterBanner specialty={highlightedSpecialty} onClear={() => setHighlightedSpecialty(null)} />
         )}
         <InteractionPanel
           agent={selectedAgent}
@@ -372,28 +317,20 @@ export default function App() {
     );
   }
 
+  // ── Embed mode ───────────────────────────────────────────────────────────────
   if (EMBED_MODE) {
     return (
       <div style={{ width: "100vw", height: "100vh", overflow: "hidden", background: "transparent", position: "relative" }}>
         <Scene3D
-          agents={agents}
+          agents={embedInitAgent ? [embedInitAgent] : lobbyAgents}
           selectedAgent={selectedAgent}
           speakingAgentId={speakingAgentId}
-          pagedAgentId={pagedAgentId}
           specialtyFilter={highlightedSpecialty}
           onSelectAgent={handleSelectAgent}
         />
         {highlightedSpecialty && (
-          <SpecialtyFilterBanner
-            specialty={highlightedSpecialty}
-            onClear={() => setHighlightedSpecialty(null)}
-          />
+          <SpecialtyFilterBanner specialty={highlightedSpecialty} onClear={() => setHighlightedSpecialty(null)} />
         )}
-        <AgentIntroCard
-          agent={selectedAgent ? null : pagedAgent}
-          onChat={handleIntroChat}
-          onStandDown={() => {}}
-        />
         <InteractionPanel
           agent={selectedAgent}
           isSpeaking={speakingAgentId !== null}
@@ -407,22 +344,20 @@ export default function App() {
     );
   }
 
+  // ── Full layout ──────────────────────────────────────────────────────────────
   return (
     <div style={{ width: "100vw", height: "100vh", overflow: "hidden", background: "#010108" }}>
       {showWalkthrough && <Walkthrough onComplete={handleWalkthroughComplete} />}
 
-      <HUD
-        agentCount={agents.length}
-        pagedAgentName={pagedAgent?.name ?? null}
-      />
+      <HUD agentCount={agents.length} lobbyCount={lobbyAgents.length} />
 
+      {/* Left sidebar — shows ALL agents for chat access; badges for lobby/office */}
       <AgentSelector
         agents={agents}
         selectedAgent={selectedAgent}
-        pagedAgentId={pagedAgentId}
+        lobbyAgentIds={lobbyAgentIds}
         activeSpecialtyFilter={highlightedSpecialty}
         onSelect={handleSelectAgent}
-        onPage={handlePageAgent}
         onSpecialtyFilter={setHighlightedSpecialty}
       />
 
@@ -435,27 +370,18 @@ export default function App() {
           transition: "margin-right 0.3s ease",
         }}
       >
+        {/* 3D scene only renders lobby agents at their lobby positions */}
         <Scene3D
-          agents={agents}
+          agents={lobbyAgents}
           selectedAgent={selectedAgent}
           speakingAgentId={speakingAgentId}
-          pagedAgentId={pagedAgentId}
           specialtyFilter={highlightedSpecialty}
           onSelectAgent={handleSelectAgent}
         />
         {highlightedSpecialty && (
-          <SpecialtyFilterBanner
-            specialty={highlightedSpecialty}
-            onClear={() => setHighlightedSpecialty(null)}
-          />
+          <SpecialtyFilterBanner specialty={highlightedSpecialty} onClear={() => setHighlightedSpecialty(null)} />
         )}
       </div>
-
-      <AgentIntroCard
-        agent={selectedAgent ? null : pagedAgent}
-        onChat={handleIntroChat}
-        onStandDown={handleIntroStandDown}
-      />
 
       <InteractionPanel
         agent={selectedAgent}

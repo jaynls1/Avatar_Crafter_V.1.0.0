@@ -4,36 +4,21 @@ import { Agent } from "../agents";
 interface AgentSelectorProps {
   agents: Agent[];
   selectedAgent: Agent | null;
-  pagedAgentId: string | null;
+  lobbyAgentIds: Set<string>;
   activeSpecialtyFilter: string | null;
   onSelect: (agent: Agent) => void;
-  onPage: (agentId: string | null) => void;
   onSpecialtyFilter: (specialty: string | null) => void;
 }
 
 export function AgentSelector({
   agents,
   selectedAgent,
-  pagedAgentId,
+  lobbyAgentIds,
   activeSpecialtyFilter,
   onSelect,
-  onPage,
   onSpecialtyFilter,
 }: AgentSelectorProps) {
-  const [paging, setPaging] = useState<string | null>(null);
   const [searchText, setSearchText] = useState("");
-
-  const handlePage = (agent: Agent) => {
-    if (pagedAgentId === agent.id) {
-      onPage(null);
-      return;
-    }
-    setPaging(agent.id);
-    setTimeout(() => {
-      setPaging(null);
-      onPage(agent.id);
-    }, 1200);
-  };
 
   const specialties = useMemo(() => {
     const seen = new Set<string>();
@@ -81,10 +66,10 @@ export function AgentSelector({
         }}
       >
         <div style={{ color: "#A78BFA", fontSize: 10, fontWeight: 700, letterSpacing: 2.5, marginBottom: 2 }}>
-          ◈ NEXT DISPATCH
+          ◈ NEXT AGENTS
         </div>
         <div style={{ color: "rgba(255,255,255,0.3)", fontSize: 10 }}>
-          Page an agent to center stage
+          Click any agent to chat
         </div>
       </div>
 
@@ -153,13 +138,7 @@ export function AgentSelector({
         </div>
 
         {/* Specialty pills */}
-        <div
-          style={{
-            display: "flex",
-            flexWrap: "wrap",
-            gap: 4,
-          }}
-        >
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
           <button
             onClick={() => onSpecialtyFilter(null)}
             style={{
@@ -211,76 +190,73 @@ export function AgentSelector({
       {/* Agent list */}
       <div style={{ flex: 1, overflowY: "auto", padding: "6px 0" }}>
         {filteredAgents.length === 0 ? (
-          <div
-            style={{
-              padding: "24px 16px",
-              textAlign: "center",
-              color: "rgba(255,255,255,0.25)",
-              fontSize: 11,
-            }}
-          >
+          <div style={{ padding: "24px 16px", textAlign: "center", color: "rgba(255,255,255,0.25)", fontSize: 11 }}>
             No agents match
           </div>
         ) : (
           filteredAgents.map((agent) => {
             const isSelected = selectedAgent?.id === agent.id;
-            const isPaged = pagedAgentId === agent.id;
-            const isPaging = paging === agent.id;
+            const inLobby    = lobbyAgentIds.has(agent.id);
 
             return (
               <div
                 key={agent.id}
                 style={{
                   padding: "8px 12px",
-                  borderLeft: isPaged
-                    ? `3px solid ${agent.color}`
-                    : isSelected
+                  borderLeft: isSelected
                     ? `3px solid ${agent.color}80`
                     : "3px solid transparent",
-                  background: isPaged
-                    ? `${agent.color}18`
-                    : isSelected
-                    ? `${agent.color}0d`
-                    : "transparent",
+                  background: isSelected ? `${agent.color}0d` : "transparent",
                   transition: "all 0.25s",
+                  cursor: "pointer",
                 }}
+                onClick={() => onSelect(agent)}
               >
                 {/* Agent name row */}
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 8,
-                    marginBottom: 6,
-                    cursor: "pointer",
-                  }}
-                  onClick={() => onSelect(agent)}
-                >
-                  <div
-                    style={{
-                      width: 24,
-                      height: 24,
-                      borderRadius: "50%",
-                      background: `linear-gradient(135deg, ${agent.color}, ${agent.accentColor})`,
-                      flexShrink: 0,
-                      boxShadow: isPaged ? `0 0 10px ${agent.color}80` : "none",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      fontSize: 9,
-                      color: "white",
-                      fontWeight: 700,
-                      transition: "box-shadow 0.3s",
-                    }}
-                  >
-                    {agent.name.slice(0, 2).toUpperCase()}
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                  {/* Avatar orb */}
+                  <div style={{ position: "relative", flexShrink: 0 }}>
+                    <div
+                      style={{
+                        width: 26,
+                        height: 26,
+                        borderRadius: "50%",
+                        background: `linear-gradient(135deg, ${agent.color}, ${agent.accentColor})`,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        fontSize: 9,
+                        color: "white",
+                        fontWeight: 700,
+                        boxShadow: isSelected ? `0 0 10px ${agent.color}80` : "none",
+                        transition: "box-shadow 0.3s",
+                      }}
+                    >
+                      {agent.name.slice(0, 2).toUpperCase()}
+                    </div>
+                    {/* Lobby presence dot */}
+                    <div
+                      style={{
+                        position: "absolute",
+                        bottom: 0,
+                        right: 0,
+                        width: 8,
+                        height: 8,
+                        borderRadius: "50%",
+                        background: inLobby ? "#10B981" : "rgba(255,255,255,0.15)",
+                        border: "1.5px solid rgba(4,4,18,0.92)",
+                        boxShadow: inLobby ? "0 0 6px #10B981" : "none",
+                        transition: "all 0.4s",
+                      }}
+                      title={inLobby ? "In lobby now" : "In their office"}
+                    />
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div
                       style={{
-                        color: isPaged ? "white" : isSelected ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.65)",
+                        color: isSelected ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.65)",
                         fontSize: 12,
-                        fontWeight: isPaged ? 700 : 500,
+                        fontWeight: isSelected ? 600 : 500,
                         whiteSpace: "nowrap",
                         overflow: "hidden",
                         textOverflow: "ellipsis",
@@ -290,74 +266,37 @@ export function AgentSelector({
                     </div>
                     <div
                       style={{
-                        color: "rgba(255,255,255,0.3)",
+                        color: inLobby ? "#10B98170" : "rgba(255,255,255,0.25)",
                         fontSize: 9,
                         whiteSpace: "nowrap",
                         overflow: "hidden",
                         textOverflow: "ellipsis",
                       }}
                     >
-                      {agent.specialty}
+                      {inLobby ? "● In lobby" : agent.specialty}
                     </div>
                   </div>
                 </div>
 
-                {/* Action buttons row */}
-                <div style={{ display: "flex", gap: 5 }}>
-                  {/* Chat button */}
-                  <button
-                    onClick={() => onSelect(agent)}
-                    style={{
-                      flex: 1,
-                      padding: "4px 0",
-                      borderRadius: 6,
-                      border: `1px solid ${isSelected ? agent.color + "60" : "rgba(255,255,255,0.1)"}`,
-                      background: isSelected ? `${agent.color}20` : "rgba(255,255,255,0.04)",
-                      color: isSelected ? agent.accentColor : "rgba(255,255,255,0.45)",
-                      fontSize: 10,
-                      cursor: "pointer",
-                      fontWeight: 500,
-                      transition: "all 0.2s",
-                    }}
-                  >
-                    💬 Chat
-                  </button>
-
-                  {/* Dispatch/Page button */}
-                  <button
-                    onClick={() => handlePage(agent)}
-                    disabled={isPaging}
-                    style={{
-                      flex: 1,
-                      padding: "4px 0",
-                      borderRadius: 6,
-                      border: `1px solid ${
-                        isPaged
-                          ? agent.color
-                          : isPaging
-                          ? agent.color + "80"
-                          : "rgba(255,255,255,0.1)"
-                      }`,
-                      background: isPaged
-                        ? `${agent.color}30`
-                        : isPaging
-                        ? `${agent.color}15`
-                        : "rgba(255,255,255,0.04)",
-                      color: isPaged
-                        ? agent.accentColor
-                        : isPaging
-                        ? agent.color
-                        : "rgba(255,255,255,0.45)",
-                      fontSize: 10,
-                      cursor: isPaging ? "default" : "pointer",
-                      fontWeight: isPaged ? 700 : 500,
-                      transition: "all 0.2s",
-                      animation: isPaging ? "pagePulse 0.6s ease-in-out infinite" : "none",
-                    }}
-                  >
-                    {isPaged ? "✓ Stage" : isPaging ? "📡 Paging" : "📡 Page"}
-                  </button>
-                </div>
+                {/* Chat button */}
+                <button
+                  onClick={(e) => { e.stopPropagation(); onSelect(agent); }}
+                  style={{
+                    width: "100%",
+                    padding: "4px 0",
+                    borderRadius: 6,
+                    border: `1px solid ${isSelected ? agent.color + "60" : "rgba(255,255,255,0.1)"}`,
+                    background: isSelected ? `${agent.color}20` : "rgba(255,255,255,0.04)",
+                    color: isSelected ? agent.accentColor : "rgba(255,255,255,0.45)",
+                    fontSize: 10,
+                    cursor: "pointer",
+                    fontWeight: 500,
+                    transition: "all 0.2s",
+                    fontFamily: "'Inter', sans-serif",
+                  }}
+                >
+                  💬 Chat
+                </button>
               </div>
             );
           })
@@ -375,16 +314,12 @@ export function AgentSelector({
           flexShrink: 0,
         }}
       >
-        📡 Page → center stage<br />
-        💬 Chat → open panel<br />
+        <span style={{ color: "#10B98170" }}>●</span> In lobby now<br />
+        <span style={{ color: "rgba(255,255,255,0.15)" }}>●</span> In their office<br />
         🖱️ Drag to explore
       </div>
 
       <style>{`
-        @keyframes pagePulse {
-          0%, 100% { opacity: 1; }
-          50% { opacity: 0.5; }
-        }
         .agent-selector-search::placeholder { color: rgba(255,255,255,0.25); }
         .agent-selector-search:focus {
           border-color: rgba(167,139,250,0.4) !important;

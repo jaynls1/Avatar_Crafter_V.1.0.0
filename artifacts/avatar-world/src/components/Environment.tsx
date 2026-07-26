@@ -661,13 +661,66 @@ export function Environment3D({ onDoorClick }: { onDoorClick?: (agentId: string)
       <WallSconce position={[12.95, 2.5, -5]} />
       <WallSconce position={[12.95, 2.5, -9]} />
 
-      {/* ── Raised platforms for elevated agents ── */}
-      {/* Sniper — [7.5, 1.2, -5] */}
-      <RaisedPlatform x={7.5} z={-5} agentY={1.2} color="#F97316" radius={1.5} />
-      {/* Meme — [-7, 1.2, -4] */}
-      <RaisedPlatform x={-7} z={-4} agentY={1.2} color="#FB923C" radius={1.5} />
-      {/* Haven — [6.5, 1.8, -9] */}
-      <RaisedPlatform x={6.5} z={-9} agentY={1.8} color="#F97316" radius={1.6} />
+      {/* ── Reception desk — Nova's permanent lobby position [0, 0, 2] ── */}
+      {/* Counter */}
+      <mesh position={[0, -0.72, 2.8]} castShadow receiveShadow>
+        <boxGeometry args={[3.2, 0.56, 0.7]} />
+        <meshStandardMaterial color="#1e1208" roughness={0.55} metalness={0.08} />
+      </mesh>
+      {/* Counter top */}
+      <mesh position={[0, -0.42, 2.8]}>
+        <boxGeometry args={[3.24, 0.06, 0.74]} />
+        <meshStandardMaterial color="#2e1c0e" roughness={0.45} metalness={0.12} />
+      </mesh>
+      {/* Counter front accent strip */}
+      <mesh position={[0, -0.7, 3.17]}>
+        <boxGeometry args={[3.2, 0.04, 0.02]} />
+        <meshStandardMaterial color="#3B82F6" emissive="#3B82F6" emissiveIntensity={0.6} roughness={0} metalness={0} />
+      </mesh>
+      {/* Desk monitor */}
+      <mesh position={[-0.6, -0.08, 2.62]}>
+        <boxGeometry args={[0.72, 0.44, 0.045]} />
+        <meshStandardMaterial color="#0e1014" roughness={0.25} metalness={0.92} emissive="#0a2060" emissiveIntensity={0.55} />
+      </mesh>
+      <pointLight position={[-0.6, -0.1, 2.5]} intensity={0.35} color="#4080ff" distance={2} />
+      {/* Small plant on counter */}
+      <mesh position={[1.2, -0.28, 2.62]}>
+        <sphereGeometry args={[0.22, 8, 7]} />
+        <meshStandardMaterial color="#1a3d0a" roughness={0.95} metalness={0} />
+      </mesh>
+      {/* "NEXT HQ" welcome sign above the desk */}
+      <Billboard position={[0, 1.6, 3.0]}>
+        <Text fontSize={0.28} color="#3B82F6" anchorX="center" anchorY="middle" outlineWidth={0.02} outlineColor="#000">
+          ◈ NEXT LEVEL HQ
+        </Text>
+        <Text position={[0, -0.38, 0]} fontSize={0.13} color="rgba(255,255,255,0.35)" anchorX="center" anchorY="middle" outlineWidth={0.01} outlineColor="#000">
+          Nova is here to help
+        </Text>
+      </Billboard>
+
+      {/* ── Lobby wayfinding — glowing floor strips leading to each wing ── */}
+      {/* Strip toward Strategy Wing (left hallway at x ≈ -13, z ≈ -5) */}
+      <mesh position={[-6.5, -1.493, -2.5]} rotation={[-Math.PI / 2, Math.atan2(2.5, 6.5), 0]}>
+        <planeGeometry args={[0.12, 14]} />
+        <meshBasicMaterial color="#F97316" transparent opacity={0.25} side={THREE.DoubleSide} />
+      </mesh>
+      {/* Strip toward Ops Wing (center hallway at z ≈ -14.5) */}
+      <mesh position={[0, -1.493, -8]} rotation={[-Math.PI / 2, 0, 0]}>
+        <planeGeometry args={[0.12, 12]} />
+        <meshBasicMaterial color="#F97316" transparent opacity={0.25} side={THREE.DoubleSide} />
+      </mesh>
+      {/* Lobby overhead direction sign — Strategy Wing */}
+      <Billboard position={[-9, 3.2, -1]}>
+        <Text fontSize={0.14} color="#F97316" anchorX="center" anchorY="middle" outlineWidth={0.012} outlineColor="#000">
+          ← STRATEGY WING
+        </Text>
+      </Billboard>
+      {/* Lobby overhead direction sign — Ops Wing */}
+      <Billboard position={[0, 3.2, -8]}>
+        <Text fontSize={0.14} color="#F97316" anchorX="center" anchorY="middle" outlineWidth={0.012} outlineColor="#000">
+          ↑ OPS WING
+        </Text>
+      </Billboard>
 
       {/* City skyline (far background) */}
       <CityBuilding position={[1,   20, -56]} w={17} h={56} d={10} seed={1} />
