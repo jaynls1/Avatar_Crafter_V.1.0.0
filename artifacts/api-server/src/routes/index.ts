@@ -8,12 +8,16 @@ import roomsRouter from "./rooms";
 import adminRouter from "./admin";
 import memoryRouter from "./memory";
 import officesRouter from "./offices";
+import hqScreenRouter from "./hqScreen";
+import visitorsRouter from "./visitors";
 
 const router: IRouter = Router();
 
 router.use(healthRouter);
 router.use(authRouter);
 router.use(officesRouter);   // public — must come before adminRouter
+router.use(hqScreenRouter);  // public — before adminRouter
+router.use(visitorsRouter);  // public — before adminRouter
 router.use(openaiRouter);
 router.use(agentsRouter);
 router.use(securityRouter);

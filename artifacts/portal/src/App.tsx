@@ -55,7 +55,7 @@ function classifyTone(text: string): GestureSet {
   return "calm";
 }
 
-type Screen = "door" | "opening" | "nova" | "lobby" | "about" | "rook" | "backoffice";
+type Screen = "door" | "opening" | "nova" | "lobby" | "intake" | "about" | "rook" | "backoffice";
 
 const O = "#F97316";
 const OL = "#FB923C";
@@ -1634,6 +1634,162 @@ function NovaLobby({ onEnterWorld, onAbout, onRook, onBackOffice, visitedAbout }
   );
 }
 
+// ─── Visitor Intake Form ─────────────────────────────────────────────────────
+const GOAL_OPTIONS = [
+  "Build a Business",
+  "Grow a Community",
+  "Explore AI Tools",
+  "Just looking",
+] as const;
+
+function IntakeForm({ onEnter, onBack }: { onEnter: () => void; onBack: () => void }) {
+  const [name, setName]     = useState("");
+  const [goal, setGoal]     = useState("");
+  const [error, setError]   = useState("");
+  const [loading, setLoading] = useState(false);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!name.trim()) { setError("Please tell us your name."); return; }
+    if (!goal)        { setError("Please choose what brings you here."); return; }
+    setError("");
+    setLoading(true);
+    try {
+      await fetch("/api/visitors", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: name.trim(), goal }),
+      });
+    } catch { /* never block entry on API failure */ }
+    onEnter();
+  }
+
+  return (
+    <div style={{
+      position: "fixed", inset: 0,
+      background: "rgba(0,0,0,0.88)",
+      display: "flex", alignItems: "center", justifyContent: "center",
+      zIndex: 50,
+    }}>
+      <div style={{
+        background: "linear-gradient(160deg, #0c0806 0%, #0a0500 100%)",
+        border: `1px solid ${OR(0.25)}`,
+        borderRadius: 20,
+        padding: "36px 40px 32px",
+        maxWidth: 420, width: "90%",
+        boxShadow: `0 0 80px ${OR(0.12)}, 0 24px 64px rgba(0,0,0,0.8)`,
+      }}>
+        {/* Header */}
+        <div style={{ textAlign: "center", marginBottom: 28 }}>
+          <div style={{
+            fontSize: 10, letterSpacing: 3, color: OR(0.6),
+            textTransform: "uppercase", marginBottom: 8, fontWeight: 600,
+          }}>NEXT LEVEL HQ</div>
+          <div style={{ fontSize: 22, fontWeight: 700, color: "#fff", lineHeight: 1.2 }}>
+            Before you enter…
+          </div>
+          <div style={{ fontSize: 13, color: "rgba(255,255,255,0.4)", marginTop: 6, lineHeight: 1.5 }}>
+            Help us personalise your experience.
+          </div>
+        </div>
+
+        <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          {/* Name */}
+          <div>
+            <label style={{ fontSize: 11, color: OR(0.7), letterSpacing: 1, textTransform: "uppercase", fontWeight: 600, display: "block", marginBottom: 6 }}>
+              What's your name?
+            </label>
+            <input
+              type="text"
+              value={name}
+              onChange={e => setName(e.target.value)}
+              placeholder="First name or handle"
+              autoFocus
+              style={{
+                width: "100%", padding: "12px 14px", borderRadius: 10,
+                background: "rgba(255,255,255,0.05)",
+                border: `1px solid ${name ? OR(0.4) : "rgba(255,255,255,0.1)"}`,
+                color: "#fff", fontSize: 14, outline: "none",
+                transition: "border-color 0.2s",
+                boxSizing: "border-box",
+              }}
+              onFocus={e => (e.currentTarget.style.borderColor = OR(0.5))}
+              onBlur={e => (e.currentTarget.style.borderColor = name ? OR(0.4) : "rgba(255,255,255,0.1)")}
+            />
+          </div>
+
+          {/* Goal */}
+          <div>
+            <label style={{ fontSize: 11, color: OR(0.7), letterSpacing: 1, textTransform: "uppercase", fontWeight: 600, display: "block", marginBottom: 6 }}>
+              What brings you to NEXT?
+            </label>
+            <select
+              value={goal}
+              onChange={e => setGoal(e.target.value)}
+              style={{
+                width: "100%", padding: "12px 14px", borderRadius: 10,
+                background: "#0e0a06",
+                border: `1px solid ${goal ? OR(0.4) : "rgba(255,255,255,0.1)"}`,
+                color: goal ? "#fff" : "rgba(255,255,255,0.35)",
+                fontSize: 14, outline: "none", cursor: "pointer",
+                boxSizing: "border-box", appearance: "none",
+                backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23f97316' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E")`,
+                backgroundRepeat: "no-repeat",
+                backgroundPosition: "right 14px center",
+                paddingRight: 36,
+              }}
+            >
+              <option value="" disabled style={{ color: "rgba(255,255,255,0.3)" }}>Select one…</option>
+              {GOAL_OPTIONS.map(g => (
+                <option key={g} value={g} style={{ background: "#0e0a06", color: "#fff" }}>{g}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Error */}
+          {error && (
+            <div style={{ fontSize: 12, color: "#f87171", padding: "8px 12px", background: "rgba(248,113,113,0.1)", borderRadius: 8, border: "1px solid rgba(248,113,113,0.2)" }}>
+              {error}
+            </div>
+          )}
+
+          {/* Actions */}
+          <div style={{ display: "flex", gap: 10, marginTop: 6 }}>
+            <button
+              type="button"
+              onClick={onBack}
+              style={{
+                flex: "0 0 auto", padding: "12px 18px", borderRadius: 10,
+                background: "transparent", border: "1px solid rgba(255,255,255,0.1)",
+                color: "rgba(255,255,255,0.4)", cursor: "pointer", fontSize: 13,
+                transition: "all 0.2s",
+              }}
+              onMouseEnter={e => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.25)"; e.currentTarget.style.color = "rgba(255,255,255,0.7)"; }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.1)"; e.currentTarget.style.color = "rgba(255,255,255,0.4)"; }}
+            >← Back</button>
+            <button
+              type="submit"
+              disabled={loading}
+              style={{
+                flex: 1, padding: "12px 24px", borderRadius: 10, border: "none",
+                background: loading ? "rgba(249,115,22,0.4)" : `linear-gradient(135deg, ${O}, ${OL})`,
+                color: "#fff", fontSize: 14, fontWeight: 700, cursor: loading ? "default" : "pointer",
+                letterSpacing: 0.3,
+                boxShadow: loading ? "none" : `0 4px 24px ${OR(0.4)}`,
+                transition: "all 0.2s",
+              }}
+            >{loading ? "Entering…" : "Continue →"}</button>
+          </div>
+        </form>
+
+        <div style={{ textAlign: "center", marginTop: 18, fontSize: 11, color: "rgba(255,255,255,0.18)" }}>
+          Your info is only used to personalise your HQ experience.
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
   const [screen, setScreen] = useState<Screen>("door");
   const [visitedAbout, setVisitedAbout] = useState(false);
@@ -1651,13 +1807,14 @@ export default function App() {
       {screen === "nova"    && <NovaGreeting onEnterLobby={() => setScreen("lobby")} />}
       {screen === "lobby"   && (
         <NovaLobby
-          onEnterWorld={enterWorld}
+          onEnterWorld={() => setScreen("intake")}
           onAbout={() => setScreen("about")}
           onRook={() => setScreen("rook")}
           onBackOffice={() => setScreen("backoffice")}
           visitedAbout={visitedAbout}
         />
       )}
+      {screen === "intake"     && <IntakeForm onEnter={enterWorld} onBack={() => setScreen("lobby")} />}
       {screen === "about"      && <AboutPage onBack={() => { setVisitedAbout(true); setScreen("lobby"); }} />}
       {screen === "rook"       && <RookCommandCenter onBack={() => setScreen("lobby")} />}
       {screen === "backoffice" && <BackOffice onBack={() => setScreen("lobby")} />}

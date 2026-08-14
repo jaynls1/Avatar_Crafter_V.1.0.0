@@ -1,10 +1,61 @@
 import { Suspense, useEffect, useRef, useState } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
-import { OrbitControls, Text } from "@react-three/drei";
+import { Html, OrbitControls, Text, useTexture } from "@react-three/drei";
 import { useLocation } from "wouter";
 import * as THREE from "three";
 import WebGLErrorBoundary from "./components/WebGLErrorBoundary";
 import novaImg from "./assets/nova_smiling.jpg";
+
+// ─── HQ Screen helpers ────────────────────────────────────────────────────────
+const HQ_MESSAGES = [
+  "WHERE HEART MEETS AUTOMATION",
+  "BUILD · GROW · AUTOMATE",
+  "POWERED BY AI, DRIVEN BY PURPOSE",
+  "YOUR NEXT LEVEL STARTS HERE",
+];
+
+function isImageUrl(url: string) {
+  return /\.(png|jpe?g|gif|webp|svg)(\?.*)?$/i.test(url);
+}
+
+/** Renders a direct image URL as a texture on the screen surface */
+function ScreenImage({ url }: { url: string }) {
+  const texture = useTexture(url);
+  return (
+    <mesh>
+      <planeGeometry args={[14.2, 5.3]} />
+      <meshStandardMaterial map={texture} roughness={0.05} />
+    </mesh>
+  );
+}
+
+/** Renders any embeddable URL (YouTube, Loom, mp4, etc.) via an iframe */
+function ScreenEmbed({ url, onClick }: { url: string; onClick: () => void }) {
+  return (
+    <Html
+      position={[0, 0, 0.06]}
+      transform
+      distanceFactor={9}
+      occlude={false}
+      style={{ pointerEvents: "auto" }}
+    >
+      {/* 900 × 336 px ≈ 14.2 × 5.3 world-unit aspect ratio */}
+      <iframe
+        src={url}
+        width={900}
+        height={336}
+        style={{ border: "none", borderRadius: 4, display: "block" }}
+        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+        allowFullScreen
+      />
+      {/* Invisible click-pass-through layer so OrbitControls still captures drag */}
+      <div
+        onClick={onClick}
+        style={{ position: "absolute", inset: 0, cursor: "pointer", zIndex: -1 }}
+      />
+    </Html>
+  );
+}
 
 const W = 26;
 const H = 9;
@@ -173,53 +224,114 @@ function LobbyWalls() {
   );
 }
 
-function MagicScreen({ onClick }: { onClick: () => void }) {
-  const matRef = useRef<THREE.MeshStandardMaterial>(null);
+function MagicScreen({ onClick, screenUrl }: { onClick: () => void; screenUrl?: string | null }) {
+  const matRef  = useRef<THREE.MeshStandardMaterial>(null);
   const lightRef = useRef<THREE.PointLight>(null);
   const [hovered, setHovered] = useState(false);
+  const [msgIdx, setMsgIdx]   = useState(0);
   const t = useRef(0);
+
+  // Cycle sub-message every 3.5 s when showing the branded placeholder
+  useEffect(() => {
+    if (screenUrl) return;
+    const iv = setInterval(() => setMsgIdx(i => (i + 1) % HQ_MESSAGES.length), 3500);
+    return () => clearInterval(iv);
+  }, [screenUrl]);
 
   useFrame((_, delta) => {
     t.current += delta * 0.045;
-    if (matRef.current) {
-      matRef.current.color.setHSL(t.current % 1, 0.65, 0.1);
-      matRef.current.emissive.setHSL(t.current % 1, 0.75, hovered ? 0.28 : 0.17);
+    if (matRef.current && !screenUrl) {
+      matRef.current.color.setHSL(t.current % 1, 0.55, 0.08);
+      matRef.current.emissive.setHSL(t.current % 1, 0.65, hovered ? 0.22 : 0.12);
     }
     if (lightRef.current) {
-      lightRef.current.color.setHSL(t.current % 1, 0.9, 0.55);
-      lightRef.current.intensity = 10 + Math.sin(t.current * 28) * 4;
+      if (screenUrl) {
+        lightRef.current.color.set("#fff5e0");
+        lightRef.current.intensity = 8;
+      } else {
+        lightRef.current.color.setHSL(t.current % 1, 0.9, 0.55);
+        lightRef.current.intensity = 10 + Math.sin(t.current * 28) * 4;
+      }
     }
   });
 
+  const hasImage = !!screenUrl && isImageUrl(screenUrl);
+  const hasEmbed = !!screenUrl && !isImageUrl(screenUrl);
+
   return (
     <group position={[0, 4.2, -D / 2 + 0.25]}>
+      {/* Gold border frame */}
       <mesh position={[0, 0, -0.07]}>
         <boxGeometry args={[15.4, 6.4, 0.12]} />
         <meshStandardMaterial color="#c8a050" emissive="#c8a050" emissiveIntensity={0.3} metalness={0.9} roughness={0.1} />
       </mesh>
+      {/* Inner dark bezel */}
       <mesh position={[0, 0, -0.04]}>
         <boxGeometry args={[15, 6, 0.1]} />
         <meshStandardMaterial color="#05040c" roughness={0.9} />
       </mesh>
-      <mesh
-        onClick={onClick}
-        onPointerOver={() => { setHovered(true); document.body.style.cursor = "pointer"; }}
-        onPointerOut={() => { setHovered(false); document.body.style.cursor = "default"; }}
-      >
-        <planeGeometry args={[14.2, 5.3]} />
-        <meshStandardMaterial ref={matRef} roughness={0.05} metalness={0} />
-      </mesh>
-      <Text position={[0, 0.7, 0.02]} fontSize={0.72} color="#ffffff" anchorX="center" anchorY="middle" letterSpacing={0.3} outlineWidth={0.025} outlineColor="#000">
-        NEXT LEVEL
-      </Text>
-      <Text position={[0, -0.25, 0.02]} fontSize={0.26} color="#c8a050" anchorX="center" anchorY="middle" letterSpacing={0.18}>
-        HEADQUARTERS
-      </Text>
-      {hovered && (
-        <Text position={[0, -1.1, 0.02]} fontSize={0.18} color="#ffffff" anchorX="center" anchorY="middle">
-          ▶ Enter Theatre
-        </Text>
+
+      {/* ── Branded placeholder (no URL) ── */}
+      {!screenUrl && (
+        <>
+          <mesh
+            onClick={onClick}
+            onPointerOver={() => { setHovered(true);  document.body.style.cursor = "pointer"; }}
+            onPointerOut= {() => { setHovered(false); document.body.style.cursor = "default"; }}
+          >
+            <planeGeometry args={[14.2, 5.3]} />
+            <meshStandardMaterial ref={matRef} roughness={0.05} metalness={0} />
+          </mesh>
+          <Text position={[0, 1.1, 0.02]} fontSize={0.62} color="#ffffff"
+            anchorX="center" anchorY="middle" letterSpacing={0.35}
+            outlineWidth={0.025} outlineColor="#000">
+            NEXT LEVEL SOLUTIONS
+          </Text>
+          <Text position={[0, 0.25, 0.02]} fontSize={0.22} color="#c8a050"
+            anchorX="center" anchorY="middle" letterSpacing={0.14}>
+            WHERE HEART MEETS AUTOMATION
+          </Text>
+          {/* Thin separator */}
+          <mesh position={[0, -0.12, 0.02]}>
+            <planeGeometry args={[8, 0.018]} />
+            <meshStandardMaterial color="#c8a050" emissive="#c8a050" emissiveIntensity={0.6} />
+          </mesh>
+          {/* Cycling sub-message */}
+          <Text key={msgIdx} position={[0, -0.52, 0.02]} fontSize={0.17} color="#9090b0"
+            anchorX="center" anchorY="middle" letterSpacing={0.12}>
+            {HQ_MESSAGES[msgIdx]}
+          </Text>
+          {hovered && (
+            <Text position={[0, -1.3, 0.02]} fontSize={0.16} color="#ffffff"
+              anchorX="center" anchorY="middle">
+              ▶ Enter Theatre
+            </Text>
+          )}
+        </>
       )}
+
+      {/* ── Direct image texture ── */}
+      {hasImage && (
+        <group
+          onClick={onClick}
+          onPointerOver={() => { setHovered(true);  document.body.style.cursor = "pointer"; }}
+          onPointerOut= {() => { setHovered(false); document.body.style.cursor = "default"; }}
+        >
+          <ScreenImage url={screenUrl!} />
+        </group>
+      )}
+
+      {/* ── Iframe embed ── */}
+      {hasEmbed && (
+        <>
+          <mesh>
+            <planeGeometry args={[14.2, 5.3]} />
+            <meshStandardMaterial color="#030208" roughness={1} />
+          </mesh>
+          <ScreenEmbed url={screenUrl!} onClick={onClick} />
+        </>
+      )}
+
       <pointLight ref={lightRef} position={[0, 0, 5]} intensity={10} distance={22} />
     </group>
   );
@@ -619,6 +731,15 @@ function WingTooltip({
 export default function App() {
   const [, navigate] = useLocation();
 
+  // HQ screen URL (configurable via /api/hq-screen)
+  const [screenUrl, setScreenUrl] = useState<string | null>(null);
+  useEffect(() => {
+    fetch("/api/hq-screen")
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d?.screenUrl) setScreenUrl(d.screenUrl); })
+      .catch(() => {});
+  }, []);
+
   // Greeting state
   const [greetingPhase, setGreetingPhase] = useState<GreetingPhase>("waiting");
   const [selectedWing, setSelectedWing] = useState<WingChoice>(null);
@@ -659,7 +780,7 @@ export default function App() {
             <DarkCeiling />
             <LobbyWalls />
             <LobbyColumns />
-            <MagicScreen onClick={() => navigate("/theatre")} />
+            <MagicScreen onClick={() => navigate("/theatre")} screenUrl={screenUrl} />
             <HallwayArch
               side="left"
               label="WING A"
