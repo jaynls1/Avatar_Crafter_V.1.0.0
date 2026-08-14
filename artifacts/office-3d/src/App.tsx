@@ -1,13 +1,74 @@
-import { Suspense, useRef, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { OrbitControls, Text } from "@react-three/drei";
 import { useLocation } from "wouter";
 import * as THREE from "three";
 import WebGLErrorBoundary from "./components/WebGLErrorBoundary";
+import novaImg from "./assets/nova_smiling.jpg";
 
 const W = 26;
 const H = 9;
 const D = 22;
+
+// ─── Greeting / wing state types ─────────────────────────────────────────────
+type WingChoice = "A" | "B" | null;
+type GreetingPhase = "waiting" | "visible" | "dismissing" | "gone";
+
+// ─── Static wing metadata ────────────────────────────────────────────────────
+const WING_DATA = {
+  A: {
+    title: "WING A",
+    tagline: "Build & Scale",
+    description:
+      "Where strategy, creativity, and tech come together to grow your business.",
+    color: "#4a9eff",
+    agents: [
+      { name: "Atlas",  role: "Chief AI Officer" },
+      { name: "Nova",   role: "Workshop & Build"  },
+      { name: "Sniper", role: "Sales & Consulting" },
+      { name: "Meme",   role: "Creative Studio"    },
+      { name: "Scribe", role: "Knowledge Library"  },
+      { name: "Indy",   role: "Systems & Data"     },
+    ],
+    navigate: "/hallway/left",
+    side: "left" as const,
+  },
+  B: {
+    title: "WING B",
+    tagline: "Community & Support",
+    description:
+      "Operations, security, and the people side of your business.",
+    color: "#22d3ee",
+    agents: [
+      { name: "Rook",      role: "Security & Legal"   },
+      { name: "Iggy",      role: "Innovation Garage"  },
+      { name: "Anchor",    role: "Operations"          },
+      { name: "Haven",     role: "Member Success"      },
+      { name: "Breakroom", role: "Social Lounge"       },
+    ],
+    navigate: "/hallway/right",
+    side: "right" as const,
+  },
+};
+
+// ─── Simple typewriter hook ───────────────────────────────────────────────────
+function useTypewriter(text: string, speed = 22, active = true): string {
+  const [displayed, setDisplayed] = useState("");
+  useEffect(() => {
+    if (!active) { setDisplayed(text); return; }
+    setDisplayed("");
+    let i = 0;
+    const iv = setInterval(() => {
+      i++;
+      setDisplayed(text.slice(0, i));
+      if (i >= text.length) clearInterval(iv);
+    }, speed);
+    return () => clearInterval(iv);
+  }, [text, active]);
+  return displayed;
+}
+
+// ─── 3D lobby geometry ───────────────────────────────────────────────────────
 
 function MarbleFloor() {
   return (
@@ -80,28 +141,22 @@ function LobbyWalls() {
 
   return (
     <group>
-      {/* Back wall */}
       <mesh position={[0, H / 2, -D / 2]} receiveShadow>
         <planeGeometry args={[W, H]} />
         <meshStandardMaterial color="#131020" roughness={0.9} />
       </mesh>
-      {/* Left wall — split around arch opening */}
-      {/* top section */}
       <mesh rotation={[0, Math.PI / 2, 0]} position={[-W / 2, H - (H - archH) / 2, 0]}>
         <planeGeometry args={[D, H - archH]} />
         <meshStandardMaterial color="#131020" roughness={0.9} />
       </mesh>
-      {/* front section */}
       <mesh rotation={[0, Math.PI / 2, 0]} position={[-W / 2, archH / 2, D / 2 - (D / 2 - archW / 2) / 2]}>
         <planeGeometry args={[D / 2 - archW / 2, archH]} />
         <meshStandardMaterial color="#131020" roughness={0.9} />
       </mesh>
-      {/* back section */}
       <mesh rotation={[0, Math.PI / 2, 0]} position={[-W / 2, archH / 2, -(D / 2 - (D / 2 - archW / 2) / 2)]}>
         <planeGeometry args={[D / 2 - archW / 2, archH]} />
         <meshStandardMaterial color="#131020" roughness={0.9} />
       </mesh>
-      {/* Right wall — mirror */}
       <mesh rotation={[0, -Math.PI / 2, 0]} position={[W / 2, H - (H - archH) / 2, 0]}>
         <planeGeometry args={[D, H - archH]} />
         <meshStandardMaterial color="#131020" roughness={0.9} />
@@ -138,17 +193,14 @@ function MagicScreen({ onClick }: { onClick: () => void }) {
 
   return (
     <group position={[0, 4.2, -D / 2 + 0.25]}>
-      {/* Gold border frame */}
       <mesh position={[0, 0, -0.07]}>
         <boxGeometry args={[15.4, 6.4, 0.12]} />
         <meshStandardMaterial color="#c8a050" emissive="#c8a050" emissiveIntensity={0.3} metalness={0.9} roughness={0.1} />
       </mesh>
-      {/* Inner dark bezel */}
       <mesh position={[0, 0, -0.04]}>
         <boxGeometry args={[15, 6, 0.1]} />
         <meshStandardMaterial color="#05040c" roughness={0.9} />
       </mesh>
-      {/* Screen surface */}
       <mesh
         onClick={onClick}
         onPointerOver={() => { setHovered(true); document.body.style.cursor = "pointer"; }}
@@ -173,23 +225,35 @@ function MagicScreen({ onClick }: { onClick: () => void }) {
   );
 }
 
-function HallwayArch({ side, label, subLabel, onClick }: {
+function HallwayArch({ side, label, subLabel, onClick, highlighted = false }: {
   side: "left" | "right";
   label: string;
   subLabel: string;
   onClick: () => void;
+  highlighted?: boolean;
 }) {
   const x = side === "left" ? -W / 2 + 0.1 : W / 2 - 0.1;
   const rotY = side === "left" ? -Math.PI / 2 : Math.PI / 2;
   const [hovered, setHovered] = useState(false);
   const glowRef = useRef<THREE.MeshStandardMaterial>(null);
+  const leftPostRef = useRef<THREE.MeshStandardMaterial>(null);
+  const rightPostRef = useRef<THREE.MeshStandardMaterial>(null);
   const t = useRef(0);
 
   useFrame((_, delta) => {
     t.current += delta;
+    const baseIntensity = highlighted
+      ? 0.85 + Math.sin(t.current * 2.8) * 0.35   // strong, fast pulse when highlighted
+      : (hovered ? 0.65 : 0.22) + Math.sin(t.current * 1.8) * 0.1;
+
     if (glowRef.current) {
-      glowRef.current.emissiveIntensity = (hovered ? 0.65 : 0.22) + Math.sin(t.current * 1.8) * 0.1;
+      glowRef.current.emissiveIntensity = baseIntensity;
+      if (highlighted) {
+        glowRef.current.emissive.set("#ffd070");
+      }
     }
+    if (leftPostRef.current) leftPostRef.current.emissiveIntensity = highlighted ? baseIntensity * 0.9 : 0.3;
+    if (rightPostRef.current) rightPostRef.current.emissiveIntensity = highlighted ? baseIntensity * 0.9 : 0.3;
   });
 
   const archW = 5.5;
@@ -205,12 +269,12 @@ function HallwayArch({ side, label, subLabel, onClick }: {
       {/* Left post */}
       <mesh position={[-(archW / 2 + 0.12), archH / 2, 0]}>
         <boxGeometry args={[0.24, archH + 0.24, 0.18]} />
-        <meshStandardMaterial color="#c8a050" emissive="#c8a050" emissiveIntensity={0.3} metalness={0.8} roughness={0.2} />
+        <meshStandardMaterial ref={leftPostRef} color="#c8a050" emissive="#c8a050" emissiveIntensity={0.3} metalness={0.8} roughness={0.2} />
       </mesh>
       {/* Right post */}
       <mesh position={[(archW / 2 + 0.12), archH / 2, 0]}>
         <boxGeometry args={[0.24, archH + 0.24, 0.18]} />
-        <meshStandardMaterial color="#c8a050" emissive="#c8a050" emissiveIntensity={0.3} metalness={0.8} roughness={0.2} />
+        <meshStandardMaterial ref={rightPostRef} color="#c8a050" emissive="#c8a050" emissiveIntensity={0.3} metalness={0.8} roughness={0.2} />
       </mesh>
       {/* Portal void */}
       <mesh
@@ -220,19 +284,24 @@ function HallwayArch({ side, label, subLabel, onClick }: {
         onPointerOut={() => { setHovered(false); document.body.style.cursor = "default"; }}
       >
         <planeGeometry args={[archW, archH]} />
-        <meshStandardMaterial color={hovered ? "#0d1a0d" : "#060408"} roughness={1} />
+        <meshStandardMaterial
+          color={highlighted ? "#0d1a10" : hovered ? "#0d1a0d" : "#060408"}
+          roughness={1}
+          emissive={highlighted ? "#001a04" : "#000000"}
+          emissiveIntensity={highlighted ? 0.3 : 0}
+        />
       </mesh>
       {/* Label */}
       <Text position={[0, archH + 0.6, 0]} fontSize={0.28} color="#c8a050" anchorX="center" anchorY="middle" letterSpacing={0.15} outlineWidth={0.01} outlineColor="#000">
         {label}
       </Text>
-      <Text position={[0, archH + 0.22, 0]} fontSize={0.15} color={hovered ? "#aaffaa" : "#666"} anchorX="center" anchorY="middle">
-        {hovered ? "Enter →" : subLabel}
+      <Text position={[0, archH + 0.22, 0]} fontSize={0.15} color={highlighted ? "#88ffaa" : hovered ? "#aaffaa" : "#666"} anchorX="center" anchorY="middle">
+        {highlighted ? "← Recommended →" : hovered ? "Enter →" : subLabel}
       </Text>
       {/* Floor guide */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.003, -3]}>
         <planeGeometry args={[archW, 6]} />
-        <meshStandardMaterial color="#1a1a2a" roughness={0.9} />
+        <meshStandardMaterial color={highlighted ? "#0e1f0e" : "#1a1a2a"} roughness={0.9} />
       </mesh>
     </group>
   );
@@ -266,8 +335,314 @@ function LobbyColumns() {
   );
 }
 
+// ─── Nova Greeting overlay ────────────────────────────────────────────────────
+
+const GREETING_TEXT =
+  "Welcome to Next Level HQ. I'm Nova. Are you here to build a business, grow a community, or explore what's possible with AI?";
+
+function NovaGreeting({
+  phase,
+  onChoose,
+  onDismiss,
+}: {
+  phase: GreetingPhase;
+  onChoose: (wing: WingChoice) => void;
+  onDismiss: () => void;
+}) {
+  const typed = useTypewriter(GREETING_TEXT, 22, phase === "visible");
+
+  if (phase === "waiting" || phase === "gone") return null;
+
+  return (
+    <div
+      style={{
+        position: "fixed",
+        bottom: 0,
+        left: 0,
+        right: 0,
+        display: "flex",
+        justifyContent: "center",
+        alignItems: "flex-end",
+        padding: "0 16px 24px",
+        zIndex: 30,
+        pointerEvents: "none",
+      }}
+    >
+      <div
+        className={`nova-greeting${phase === "dismissing" ? " dismissing" : ""}`}
+        style={{
+          pointerEvents: "auto",
+          maxWidth: 560,
+          width: "100%",
+          background: "rgba(10, 8, 22, 0.92)",
+          backdropFilter: "blur(20px)",
+          border: "1px solid rgba(200,160,80,0.25)",
+          borderRadius: 16,
+          padding: "20px 22px 18px",
+          boxShadow: "0 8px 48px rgba(0,0,0,0.7), 0 0 24px rgba(74,158,255,0.12)",
+        }}
+      >
+        {/* Header row */}
+        <div style={{ display: "flex", gap: 14, alignItems: "flex-start" }}>
+          {/* Nova avatar */}
+          <div style={{
+            flexShrink: 0,
+            width: 56,
+            height: 56,
+            borderRadius: "50%",
+            overflow: "hidden",
+            border: "2px solid #4a9eff",
+            boxShadow: "0 0 14px rgba(74,158,255,0.5)",
+          }}>
+            <img
+              src={novaImg}
+              alt="Nova"
+              style={{
+                width: "100%",
+                height: "100%",
+                objectFit: "cover",
+                objectPosition: "top center",
+                filter: "brightness(1.05) saturate(1.1)",
+              }}
+            />
+          </div>
+
+          {/* Name + text */}
+          <div style={{ flex: 1 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+              <span style={{
+                fontSize: 13,
+                fontWeight: 700,
+                color: "#4a9eff",
+                letterSpacing: "0.5px",
+              }}>NOVA</span>
+              <span style={{
+                fontSize: 10,
+                color: "#4a9eff",
+                background: "rgba(74,158,255,0.15)",
+                border: "1px solid rgba(74,158,255,0.3)",
+                borderRadius: 4,
+                padding: "1px 6px",
+                letterSpacing: "0.5px",
+              }}>AI GUIDE</span>
+            </div>
+            <p style={{
+              fontSize: 14,
+              color: "#ddd8cc",
+              lineHeight: 1.55,
+              minHeight: 44,
+              margin: 0,
+            }}>
+              {typed}
+              <span style={{
+                display: "inline-block",
+                width: 2,
+                height: "1em",
+                background: "#4a9eff",
+                marginLeft: 2,
+                verticalAlign: "middle",
+                opacity: typed.length < GREETING_TEXT.length ? 1 : 0,
+                transition: "opacity 0.15s",
+              }} />
+            </p>
+          </div>
+
+          {/* Dismiss X */}
+          <button
+            onClick={onDismiss}
+            style={{
+              flexShrink: 0,
+              background: "none",
+              border: "none",
+              color: "#666",
+              cursor: "pointer",
+              fontSize: 18,
+              lineHeight: 1,
+              padding: "0 2px",
+              marginTop: -2,
+              transition: "color 0.15s",
+            }}
+            onMouseEnter={e => (e.currentTarget.style.color = "#aaa")}
+            onMouseLeave={e => (e.currentTarget.style.color = "#666")}
+            aria-label="Dismiss"
+          >
+            ×
+          </button>
+        </div>
+
+        {/* Choice buttons */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 16 }}>
+          <button
+            className="nova-choice-btn"
+            onClick={() => onChoose("A")}
+          >
+            <span style={{ fontSize: 15, marginRight: 8 }}>🏢</span>
+            Build a Business
+            <span style={{ float: "right", fontSize: 11, color: "#666", marginTop: 1 }}>Wing A →</span>
+          </button>
+          <button
+            className="nova-choice-btn"
+            onClick={() => onChoose("B")}
+          >
+            <span style={{ fontSize: 15, marginRight: 8 }}>🌱</span>
+            Grow a Community
+            <span style={{ float: "right", fontSize: 11, color: "#666", marginTop: 1 }}>Wing B →</span>
+          </button>
+          <button
+            className="nova-choice-btn"
+            onClick={() => onChoose("A")}
+          >
+            <span style={{ fontSize: 15, marginRight: 8 }}>✨</span>
+            Explore what's possible with AI
+            <span style={{ float: "right", fontSize: 11, color: "#666", marginTop: 1 }}>Wing A →</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Wing tooltip overlay ─────────────────────────────────────────────────────
+
+function WingTooltip({
+  wing,
+  onNavigate,
+  onDismiss,
+}: {
+  wing: WingChoice;
+  onNavigate: (path: string) => void;
+  onDismiss: () => void;
+}) {
+  if (!wing) return null;
+  const data = WING_DATA[wing];
+  const isLeft = data.side === "left";
+
+  return (
+    <div
+      style={{
+        position: "fixed",
+        top: "50%",
+        ...(isLeft ? { left: 20 } : { right: 20 }),
+        transform: "translateY(-50%)",
+        zIndex: 30,
+        pointerEvents: "auto",
+        // CSS var for slide-in direction
+        ["--tip-from" as string]: isLeft ? "-30px" : "30px",
+      }}
+    >
+      <div
+        className="nova-tooltip"
+        style={{
+          width: 230,
+          background: "rgba(10, 8, 22, 0.94)",
+          backdropFilter: "blur(18px)",
+          border: `1px solid ${data.color}40`,
+          borderRadius: 14,
+          boxShadow: `0 8px 40px rgba(0,0,0,0.7), 0 0 20px ${data.color}22`,
+          overflow: "hidden",
+        }}
+      >
+        {/* Wing indicator arrow — points outward toward the arch */}
+        <div style={{
+          position: "absolute",
+          top: "50%",
+          ...(isLeft ? { left: -8 } : { right: -8 }),
+          transform: "translateY(-50%)",
+          width: 0,
+          height: 0,
+          borderTop: "8px solid transparent",
+          borderBottom: "8px solid transparent",
+          ...(isLeft
+            ? { borderRight: `8px solid ${data.color}60` }
+            : { borderLeft: `8px solid ${data.color}60` }),
+        }} />
+
+        {/* Accent bar */}
+        <div style={{
+          height: 3,
+          background: `linear-gradient(90deg, ${data.color}, transparent)`,
+        }} />
+
+        <div style={{ padding: "14px 16px" }}>
+          {/* Title row */}
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 4 }}>
+            <div>
+              <div style={{ fontSize: 11, color: data.color, letterSpacing: "1.5px", fontWeight: 700 }}>
+                {data.title}
+              </div>
+              <div style={{ fontSize: 13, color: "#e8e4d8", fontWeight: 600, marginTop: 1 }}>
+                {data.tagline}
+              </div>
+            </div>
+            <button
+              onClick={onDismiss}
+              style={{
+                background: "none", border: "none", color: "#555",
+                cursor: "pointer", fontSize: 16, lineHeight: 1, padding: 0,
+                marginTop: -2,
+              }}
+              onMouseEnter={e => (e.currentTarget.style.color = "#888")}
+              onMouseLeave={e => (e.currentTarget.style.color = "#555")}
+            >×</button>
+          </div>
+
+          <p style={{ fontSize: 11, color: "#888", lineHeight: 1.5, margin: "6px 0 12px" }}>
+            {data.description}
+          </p>
+
+          {/* Agent list */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 4, marginBottom: 14 }}>
+            {data.agents.map(a => (
+              <div key={a.name} style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span style={{ fontSize: 12, fontWeight: 600, color: "#d8d4cc" }}>{a.name}</span>
+                <span style={{ fontSize: 11, color: "#666" }}>{a.role}</span>
+              </div>
+            ))}
+          </div>
+
+          {/* CTA */}
+          <button
+            className="nova-wing-enter-btn"
+            style={{ width: "100%" }}
+            onClick={() => onNavigate(data.navigate)}
+          >
+            Enter {data.title} →
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── App ─────────────────────────────────────────────────────────────────────
+
 export default function App() {
   const [, navigate] = useLocation();
+
+  // Greeting state
+  const [greetingPhase, setGreetingPhase] = useState<GreetingPhase>("waiting");
+  const [selectedWing, setSelectedWing] = useState<WingChoice>(null);
+  const [tooltipDismissed, setTooltipDismissed] = useState(false);
+
+  // Trigger greeting 2.5 s after mount
+  useEffect(() => {
+    const t = setTimeout(() => setGreetingPhase("visible"), 2500);
+    return () => clearTimeout(t);
+  }, []);
+
+  function handleChoose(wing: WingChoice) {
+    setGreetingPhase("dismissing");
+    setSelectedWing(wing);
+    setTooltipDismissed(false);
+    setTimeout(() => setGreetingPhase("gone"), 320);
+  }
+
+  function handleDismissGreeting() {
+    setGreetingPhase("dismissing");
+    setTimeout(() => setGreetingPhase("gone"), 320);
+  }
+
+  const showTooltip = selectedWing !== null && !tooltipDismissed && greetingPhase === "gone";
 
   return (
     <div style={{ width: "100vw", height: "100vh", background: "#08060f" }}>
@@ -285,8 +660,20 @@ export default function App() {
             <LobbyWalls />
             <LobbyColumns />
             <MagicScreen onClick={() => navigate("/theatre")} />
-            <HallwayArch side="left" label="WING A" subLabel="6 Offices" onClick={() => navigate("/hallway/left")} />
-            <HallwayArch side="right" label="WING B" subLabel="5 Offices" onClick={() => navigate("/hallway/right")} />
+            <HallwayArch
+              side="left"
+              label="WING A"
+              subLabel="6 Offices"
+              onClick={() => navigate("/hallway/left")}
+              highlighted={showTooltip && selectedWing === "A"}
+            />
+            <HallwayArch
+              side="right"
+              label="WING B"
+              subLabel="5 Offices"
+              onClick={() => navigate("/hallway/right")}
+              highlighted={showTooltip && selectedWing === "B"}
+            />
             <OrbitControls
               target={[0, 2.5, -2]}
               minDistance={4}
@@ -300,6 +687,8 @@ export default function App() {
           </Suspense>
         </Canvas>
       </WebGLErrorBoundary>
+
+      {/* Top HUD */}
       <div style={{ position: "fixed", top: 0, left: 0, right: 0, zIndex: 20, pointerEvents: "none" }}>
         <div style={{ padding: "14px 22px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div style={{ display: "flex", gap: 8, pointerEvents: "auto" }}>
@@ -313,6 +702,22 @@ export default function App() {
           </div>
         </div>
       </div>
+
+      {/* Nova greeting */}
+      <NovaGreeting
+        phase={greetingPhase}
+        onChoose={handleChoose}
+        onDismiss={handleDismissGreeting}
+      />
+
+      {/* Wing tooltip */}
+      {showTooltip && (
+        <WingTooltip
+          wing={selectedWing}
+          onNavigate={(path) => navigate(path)}
+          onDismiss={() => setTooltipDismissed(true)}
+        />
+      )}
     </div>
   );
 }

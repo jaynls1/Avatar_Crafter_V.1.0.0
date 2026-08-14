@@ -142,3 +142,77 @@ canvas {
   body { touch-action: none; }
   canvas { touch-action: none; }
 }
+
+/* ── NOVA GREETING OVERLAY ───────────────────────────────── */
+
+@keyframes nova-slide-up {
+  from { transform: translateY(40px); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+
+@keyframes nova-fade-out {
+  from { transform: translateY(0);    opacity: 1; }
+  to   { transform: translateY(20px); opacity: 0; }
+}
+
+@keyframes nova-tooltip-in {
+  from { transform: translateX(var(--tip-from)); opacity: 0; }
+  to   { transform: translateX(0);                opacity: 1; }
+}
+
+@keyframes wing-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(200,160,80,0); }
+  50%       { box-shadow: 0 0 28px 6px rgba(200,160,80,0.35); }
+}
+
+.nova-greeting {
+  animation: nova-slide-up 0.45s cubic-bezier(0.22,1,0.36,1) both;
+}
+
+.nova-greeting.dismissing {
+  animation: nova-fade-out 0.3s ease-in both;
+}
+
+.nova-tooltip {
+  animation: nova-tooltip-in 0.4s cubic-bezier(0.22,1,0.36,1) both;
+}
+
+.nova-choice-btn {
+  padding: 10px 18px;
+  border-radius: 10px;
+  border: 1px solid rgba(200,160,80,0.3);
+  background: rgba(200,160,80,0.08);
+  color: #e8e4d8;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  transition: all 0.18s;
+  text-align: left;
+  line-height: 1.35;
+}
+
+.nova-choice-btn:hover {
+  background: rgba(200,160,80,0.2);
+  border-color: rgba(200,160,80,0.7);
+  color: #fff;
+  transform: translateY(-1px);
+}
+
+.nova-wing-enter-btn {
+  padding: 10px 20px;
+  border-radius: 8px;
+  border: none;
+  background: #c8a050;
+  color: #0d0a14;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  transition: all 0.18s;
+  animation: wing-pulse 2s ease-in-out infinite;
+}
+
+.nova-wing-enter-btn:hover {
+  background: #e0b860;
+  transform: scale(1.03);
+}
