@@ -24,3 +24,4 @@ export * from "./rooms";
 export * from "./promptVersions";
 export * from "./memorySyncLog";
 export * from "./agentSettings";
+export * from "./offices";
