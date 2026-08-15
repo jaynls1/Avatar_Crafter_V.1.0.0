@@ -5,6 +5,7 @@ import { useLocation } from "wouter";
 import * as THREE from "three";
 import WebGLErrorBoundary from "./components/WebGLErrorBoundary";
 import novaImg from "./assets/nova_smiling.jpg";
+import Nova3D from "./components/Nova3D";
 
 // ─── HQ Screen helpers ────────────────────────────────────────────────────────
 const HQ_MESSAGES = [
@@ -781,6 +782,10 @@ export default function App() {
             <LobbyWalls />
             <LobbyColumns />
             <MagicScreen onClick={() => navigate("/theatre")} screenUrl={screenUrl} />
+            {/* Nova loads her own assets — nested Suspense so the lobby renders immediately */}
+            <Suspense fallback={null}>
+              <Nova3D position={[2.6, 0, -3.2]} rotationY={-0.5} />
+            </Suspense>
             <HallwayArch
               side="left"
               label="WING A"

@@ -620,6 +620,10 @@ importers:
         version: 3.25.76
 
   artifacts/office-3d:
+    dependencies:
+      three-stdlib:
+        specifier: 2.36.1
+        version: 2.36.1(three@0.183.2)
     devDependencies:
       '@react-three/drei':
         specifier: ^10.7.7
