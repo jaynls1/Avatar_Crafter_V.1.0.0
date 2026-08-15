@@ -150,8 +150,10 @@ export default function BackOffice({ onBack }: { onBack: () => void }) {
     try {
       const res = await fetch(`/api/admin/prompts/${agentId}`, { credentials: "include" });
       const data = await res.json();
-      setPromptVersions(data);
-      const active = data.find((v: PromptVersion) => v.active);
+      // Admin route returns an error object (not an array) when unauthenticated
+      const versions: PromptVersion[] = Array.isArray(data) ? data : [];
+      setPromptVersions(versions);
+      const active = versions.find((v) => v.active);
       setPromptDraft(active?.content || "");
     } catch {}
   }
@@ -184,7 +186,8 @@ export default function BackOffice({ onBack }: { onBack: () => void }) {
     setStatusLoading(true);
     try {
       const res = await fetch("/api/admin/agents", { credentials: "include" });
-      setAgentStatuses(await res.json());
+      const data = await res.json();
+      setAgentStatuses(Array.isArray(data) ? data : []);
     } finally {
       setStatusLoading(false);
     }
