@@ -11,8 +11,33 @@ const router: IRouter = Router();
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, PATCH, DELETE, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type",
+  "Access-Control-Allow-Headers": "Content-Type, x-admin-key",
 };
+
+// ---------------------------------------------------------------------------
+// Admin-key guard for mutation endpoints (POST / PATCH / DELETE).
+// Fails closed: if AVATAR_CRAFTER_ADMIN_KEY is not configured, mutations are
+// rejected until the secret is set. GET remains public.
+// ---------------------------------------------------------------------------
+import type { Request, Response, NextFunction } from "express";
+import { timingSafeEqual } from "node:crypto";
+
+function requireAdminKey(req: Request, res: Response, next: NextFunction) {
+  Object.entries(CORS_HEADERS).forEach(([k, v]) => res.setHeader(k, v));
+  const expected = process.env.AVATAR_CRAFTER_ADMIN_KEY;
+  if (!expected) {
+    res.status(503).json({ error: "Admin key not configured on server" });
+    return;
+  }
+  const provided = req.header("x-admin-key") ?? "";
+  const a = Buffer.from(provided);
+  const b = Buffer.from(expected);
+  if (a.length !== b.length || !timingSafeEqual(a, b)) {
+    res.status(401).json({ error: "Invalid or missing x-admin-key" });
+    return;
+  }
+  next();
+}
 
 function setCors(res: ReturnType<typeof import("express").response.json>) {
   Object.entries(CORS_HEADERS).forEach(([k, v]) => res.setHeader(k, v));
@@ -126,7 +151,7 @@ router.get("/offices", async (_req, res) => {
 // ---------------------------------------------------------------------------
 // POST /api/offices — create a new office
 // ---------------------------------------------------------------------------
-router.post("/offices", async (req, res) => {
+router.post("/offices", requireAdminKey, async (req, res) => {
   Object.entries(CORS_HEADERS).forEach(([k, v]) => res.setHeader(k, v));
   try {
     const { slug, name, description = "", url, wing = "A", accentColor = "#4a9eff" } = req.body ?? {};
@@ -180,7 +205,7 @@ router.post("/offices", async (req, res) => {
 // ---------------------------------------------------------------------------
 // PATCH /api/offices/:slug — partial update
 // ---------------------------------------------------------------------------
-router.patch("/offices/:slug", async (req, res) => {
+router.patch("/offices/:slug", requireAdminKey, async (req, res) => {
   Object.entries(CORS_HEADERS).forEach(([k, v]) => res.setHeader(k, v));
   try {
     await bootstrap();
@@ -236,7 +261,7 @@ router.patch("/offices/:slug", async (req, res) => {
 // ---------------------------------------------------------------------------
 // DELETE /api/offices/:slug — soft-delete
 // ---------------------------------------------------------------------------
-router.delete("/offices/:slug", async (req, res) => {
+router.delete("/offices/:slug", requireAdminKey, async (req, res) => {
   Object.entries(CORS_HEADERS).forEach(([k, v]) => res.setHeader(k, v));
   try {
     await bootstrap();
