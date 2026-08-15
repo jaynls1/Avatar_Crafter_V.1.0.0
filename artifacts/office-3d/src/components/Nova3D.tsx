@@ -23,14 +23,21 @@ export default function Nova3D({
   const groupRef = useRef<THREE.Group>(null);
 
   const model = useMemo(() => {
-    const scene = collada.scene.clone(true);
+    // The MakeHuman rig's skeleton doesn't resolve in ColladaLoader
+    // ("Unable to find root bone"), so we bake every SkinnedMesh into a
+    // plain static Mesh in its bind pose. We never animate the rig, and
+    // this avoids the matrixWorld crash inside Box3.setFromObject.
+    const source = collada.scene;
+    const group = new THREE.Group();
 
-    // Make all meshes double-sided & shadow-casting; fix transparent parts
-    scene.traverse((obj) => {
+    source.updateMatrixWorld(true);
+    source.traverse((obj) => {
       if ((obj as THREE.Mesh).isMesh) {
-        const mesh = obj as THREE.Mesh;
-        mesh.castShadow = true;
-        const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+        const src = obj as THREE.Mesh;
+        const staticMesh = new THREE.Mesh(src.geometry, src.material);
+        staticMesh.applyMatrix4(src.matrixWorld);
+        staticMesh.castShadow = true;
+        const mats = Array.isArray(staticMesh.material) ? staticMesh.material : [staticMesh.material];
         mats.forEach((m) => {
           const mat = m as THREE.MeshPhongMaterial;
           mat.side = THREE.DoubleSide;
@@ -41,20 +48,22 @@ export default function Nova3D({
             mat.depthWrite = true;
           }
         });
+        group.add(staticMesh);
       }
     });
 
-    // Auto-scale to target height and rest feet at y=0
-    const box = new THREE.Box3().setFromObject(scene);
+    // Auto-scale to target height and rest feet at y=0, computed from
+    // geometry bounds (safe for plain meshes).
+    const box = new THREE.Box3().setFromObject(group);
     const size = new THREE.Vector3();
     box.getSize(size);
     const scale = size.y > 0 ? targetHeight / size.y : 1;
-    scene.scale.setScalar(scene.scale.x * scale);
+    group.scale.setScalar(scale);
 
-    const box2 = new THREE.Box3().setFromObject(scene);
-    scene.position.y -= box2.min.y;
+    const box2 = new THREE.Box3().setFromObject(group);
+    group.position.y -= box2.min.y;
 
-    return scene;
+    return group;
   }, [collada, targetHeight]);
 
   // Subtle idle sway so she feels alive
