@@ -4,6 +4,7 @@ import { Html, OrbitControls, Text, useTexture } from "@react-three/drei";
 import { useLocation } from "wouter";
 import * as THREE from "three";
 import WebGLErrorBoundary from "./components/WebGLErrorBoundary";
+import Nova3D from "./components/Nova3D";
 import novaImg from "./assets/nova_smiling.jpg";
 
 // ─── HQ Screen helpers ────────────────────────────────────────────────────────
@@ -462,6 +463,126 @@ function NovaGreeting({
   onDismiss: () => void;
 }) {
   const typed = useTypewriter(GREETING_TEXT, 22, phase === "visible");
+  const [chatOpen, setChatOpen] = useState(false);
+  const [chatLoading, setChatLoading] = useState(false);
+  const [chatSending, setChatSending] = useState(false);
+  const [chatInput, setChatInput] = useState("");
+  const [chatConvId, setChatConvId] = useState<number | null>(null);
+  const [chatError, setChatError] = useState("");
+  const [chatMessages, setChatMessages] = useState<Array<{
+    from: "nova" | "user";
+    text: string;
+    streaming?: boolean;
+  }>>([]);
+  const chatEndRef = useRef<HTMLDivElement>(null);
+  const chatAbortRef = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [chatMessages]);
+
+  useEffect(() => {
+    return () => chatAbortRef.current?.abort();
+  }, []);
+
+  async function openChat() {
+    setChatOpen(true);
+    setChatError("");
+    if (chatConvId || chatLoading) return;
+
+    setChatLoading(true);
+    try {
+      const response = await fetch("/api/openai/conversations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: "Chat with Nova", agentId: "nova" }),
+      });
+      const conversation = await response.json();
+      if (!response.ok || typeof conversation.id !== "number") {
+        throw new Error(conversation.error || "Nova is unavailable right now.");
+      }
+      setChatConvId(conversation.id);
+      setChatMessages([{
+        from: "nova",
+        text: "I'm here. Ask me anything about NEXT, or tell me what you're building.",
+      }]);
+    } catch (error) {
+      setChatError(error instanceof Error ? error.message : "Nova is unavailable right now.");
+    } finally {
+      setChatLoading(false);
+    }
+  }
+
+  async function sendChat() {
+    const text = chatInput.trim();
+    if (!text || !chatConvId || chatSending) return;
+
+    setChatInput("");
+    setChatSending(true);
+    setChatMessages((previous) => [
+      ...previous,
+      { from: "user", text },
+      { from: "nova", text: "", streaming: true },
+    ]);
+
+    chatAbortRef.current?.abort();
+    const controller = new AbortController();
+    chatAbortRef.current = controller;
+
+    try {
+      const response = await fetch(`/api/openai/conversations/${chatConvId}/messages`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content: text }),
+        signal: controller.signal,
+      });
+      if (!response.ok || !response.body) {
+        throw new Error("Nova could not answer right now.");
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
+
+        for (const line of lines) {
+          if (!line.startsWith("data: ")) continue;
+          try {
+            const data = JSON.parse(line.slice(6));
+            if (data.done) {
+              setChatMessages((previous) => previous.map((message, index) =>
+                index === previous.length - 1 ? { ...message, streaming: false } : message
+              ));
+            } else if (data.content) {
+              setChatMessages((previous) => previous.map((message, index) =>
+                index === previous.length - 1
+                  ? { ...message, text: message.text + data.content }
+                  : message
+              ));
+            }
+          } catch {
+            // Ignore incomplete SSE chunks; the next chunk completes the JSON.
+          }
+        }
+      }
+    } catch (error) {
+      if ((error as Error).name !== "AbortError") {
+        setChatMessages((previous) => previous.map((message, index) =>
+          index === previous.length - 1
+            ? { ...message, text: "Something interrupted — try again.", streaming: false }
+            : message
+        ));
+      }
+    } finally {
+      setChatSending(false);
+    }
+  }
 
   if (phase === "waiting" || phase === "gone") return null;
 
@@ -582,6 +703,93 @@ function NovaGreeting({
           </button>
         </div>
 
+        {/* Working Nova chat, available before choosing a wing */}
+        {chatOpen && (
+          <div style={{
+            marginTop: 16,
+            padding: 12,
+            borderRadius: 10,
+            background: "rgba(74,158,255,0.06)",
+            border: "1px solid rgba(74,158,255,0.2)",
+          }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+              <span style={{ color: "#8dbfff", fontSize: 11, fontWeight: 700, letterSpacing: 1 }}>CHAT WITH NOVA</span>
+              <button
+                onClick={() => setChatOpen(false)}
+                style={{ background: "none", border: "none", color: "#666", cursor: "pointer", fontSize: 13 }}
+              >
+                Hide
+              </button>
+            </div>
+            {chatLoading ? (
+              <div style={{ color: "#888", fontSize: 12, padding: "8px 0" }}>Connecting to Nova…</div>
+            ) : (
+              <>
+                <div style={{ maxHeight: 150, overflowY: "auto", display: "flex", flexDirection: "column", gap: 7, marginBottom: 8 }}>
+                  {chatMessages.map((message, index) => (
+                    <div
+                      key={index}
+                      style={{
+                        alignSelf: message.from === "user" ? "flex-end" : "flex-start",
+                        maxWidth: "88%",
+                        padding: "7px 10px",
+                        borderRadius: message.from === "user" ? "10px 10px 3px 10px" : "10px 10px 10px 3px",
+                        background: message.from === "user" ? "rgba(74,158,255,0.2)" : "rgba(255,255,255,0.07)",
+                        color: "#ddd8cc",
+                        fontSize: 12,
+                        lineHeight: 1.45,
+                      }}
+                    >
+                      {message.text || "…"}
+                      {message.streaming && <span style={{ opacity: 0.6 }}>▍</span>}
+                    </div>
+                  ))}
+                  <div ref={chatEndRef} />
+                </div>
+                <div style={{ display: "flex", gap: 7 }}>
+                  <input
+                    value={chatInput}
+                    onChange={(event) => setChatInput(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") sendChat();
+                    }}
+                    placeholder="Ask Nova anything…"
+                    disabled={!chatConvId || chatSending}
+                    style={{
+                      flex: 1,
+                      minWidth: 0,
+                      border: "1px solid rgba(255,255,255,0.12)",
+                      borderRadius: 7,
+                      background: "rgba(0,0,0,0.25)",
+                      color: "#eee",
+                      padding: "8px 10px",
+                      fontSize: 12,
+                      outline: "none",
+                    }}
+                  />
+                  <button
+                    onClick={sendChat}
+                    disabled={!chatInput.trim() || !chatConvId || chatSending}
+                    style={{
+                      border: "none",
+                      borderRadius: 7,
+                      padding: "0 12px",
+                      background: chatInput.trim() && chatConvId && !chatSending ? "#4a9eff" : "rgba(255,255,255,0.1)",
+                      color: "white",
+                      cursor: chatInput.trim() && chatConvId && !chatSending ? "pointer" : "default",
+                      fontSize: 12,
+                      fontWeight: 700,
+                    }}
+                  >
+                    {chatSending ? "…" : "Send"}
+                  </button>
+                </div>
+              </>
+            )}
+            {chatError && <div style={{ color: "#ff9898", fontSize: 11, marginTop: 8 }}>{chatError}</div>}
+          </div>
+        )}
+
         {/* Choice buttons */}
         <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 16 }}>
           <button
@@ -607,6 +815,15 @@ function NovaGreeting({
             <span style={{ fontSize: 15, marginRight: 8 }}>✨</span>
             Explore what's possible with AI
             <span style={{ float: "right", fontSize: 11, color: "#666", marginTop: 1 }}>Wing A →</span>
+          </button>
+          <button
+            className="nova-choice-btn"
+            onClick={openChat}
+            style={{ borderColor: "rgba(74,158,255,0.35)" }}
+          >
+            <span style={{ fontSize: 15, marginRight: 8 }}>💬</span>
+            Chat with Nova
+            <span style={{ float: "right", fontSize: 11, color: "#666", marginTop: 1 }}>Ask me anything →</span>
           </button>
         </div>
       </div>
@@ -781,6 +998,10 @@ export default function App() {
             <LobbyWalls />
             <LobbyColumns />
             <MagicScreen onClick={() => navigate("/theatre")} screenUrl={screenUrl} />
+            {/* Nova's model loads separately so the lobby remains usable while assets load */}
+            <Suspense fallback={null}>
+              <Nova3D position={[2.6, 0, -3.2]} rotationY={-0.5} />
+            </Suspense>
             <HallwayArch
               side="left"
               label="WING A"
