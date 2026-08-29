@@ -1,6 +1,6 @@
-import { Suspense, useRef, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
-import { OrbitControls, Text, Html } from "@react-three/drei";
+import { OrbitControls, Text, Html, useTexture } from "@react-three/drei";
 import { useLocation } from "wouter";
 import * as THREE from "three";
 import { getSafeExternalUrl, GRATITUDE_ENTRIES, type GratitudeEntry } from "../data/hallway";
@@ -120,6 +120,31 @@ function GratitudeEnvironment() {
   );
 }
 
+function NextFloorMat() {
+  const texture = useTexture(
+    `${import.meta.env.BASE_URL || "/"}gratitude/next-logo-orange.png`,
+  );
+
+  useEffect(() => {
+    texture.colorSpace = THREE.SRGBColorSpace;
+    texture.anisotropy = 8;
+    texture.needsUpdate = true;
+  }, [texture]);
+
+  return (
+    <group>
+      <mesh position={[0, 0.035, 0]} receiveShadow>
+        <boxGeometry args={[4.9, 0.07, 4.9]} />
+        <meshStandardMaterial color="#080a0f" roughness={0.92} />
+      </mesh>
+      <mesh position={[0, 0.072, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+        <planeGeometry args={[4.7, 4.7]} />
+        <meshStandardMaterial map={texture} roughness={0.78} metalness={0.04} />
+      </mesh>
+    </group>
+  );
+}
+
 export default function GratitudePage() {
   const [, navigate] = useLocation();
   const webglSupported = canUseWebGL();
@@ -144,6 +169,7 @@ export default function GratitudePage() {
           <pointLight position={[0, 1, 0]} intensity={10} distance={10} color="#c8a050" />
           
           <GratitudeEnvironment />
+          <NextFloorMat />
           
           {plaques.map((plaque) => (
             <GratitudePlaque key={plaque.entry.id} entry={plaque.entry} position={plaque.position} rotY={plaque.rotY} />
