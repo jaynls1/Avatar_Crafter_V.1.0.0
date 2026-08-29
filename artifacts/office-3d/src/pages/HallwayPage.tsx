@@ -1,172 +1,175 @@
 import { Suspense, useRef, useState } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
-import { OrbitControls, Text } from "@react-three/drei";
+import { Image as DreiImage, OrbitControls, Text } from "@react-three/drei";
 import { useLocation, useParams } from "wouter";
 import * as THREE from "three";
-import { getHallwayOffices, type Office } from "../data/offices";
+import { getSafeExternalUrl, MEMBER_SUCCESS_STORIES, type MemberSuccess } from "../data/hallway";
+import WebGLErrorBoundary, { canUseWebGL, WebGLUnavailable } from "../components/WebGLErrorBoundary";
 
-const HW = 5.5;
-const HH = 4.2;
-const HD = 32;
+const HW = 7;
+const HH = 4.5;
+const HD = 40;
 
 function HallwayRoom({ wallColor }: { wallColor: string }) {
   return (
     <group>
-      {/* Carpet runner */}
+      {/* Floor */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]} receiveShadow>
         <planeGeometry args={[HW, HD]} />
-        <meshStandardMaterial color="#0e0c14" roughness={0.9} />
+        <meshStandardMaterial color="#08090c" roughness={0.7} metalness={0.2} />
       </mesh>
-      {/* Carpet strip */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.001, 0]}>
-        <planeGeometry args={[2, HD]} />
-        <meshStandardMaterial color="#1a1428" roughness={0.95} />
+      {/* Carpet runner */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.01, 0]}>
+        <planeGeometry args={[3, HD]} />
+        <meshStandardMaterial color="#0f1218" roughness={0.9} />
       </mesh>
       {/* Ceiling */}
       <mesh rotation={[Math.PI / 2, 0, 0]} position={[0, HH, 0]}>
         <planeGeometry args={[HW, HD]} />
-        <meshStandardMaterial color="#080610" roughness={1} />
+        <meshStandardMaterial color="#050608" roughness={1} />
       </mesh>
-      {/* Left wall */}
+      {/* Walls */}
       <mesh rotation={[0, Math.PI / 2, 0]} position={[-HW / 2, HH / 2, 0]}>
         <planeGeometry args={[HD, HH]} />
-        <meshStandardMaterial color={wallColor} roughness={0.88} />
+        <meshStandardMaterial color={wallColor} roughness={0.8} />
       </mesh>
-      {/* Right wall */}
       <mesh rotation={[0, -Math.PI / 2, 0]} position={[HW / 2, HH / 2, 0]}>
         <planeGeometry args={[HD, HH]} />
-        <meshStandardMaterial color={wallColor} roughness={0.88} />
-      </mesh>
-      {/* Far end wall with logo */}
-      <mesh position={[0, HH / 2, -HD / 2]}>
-        <planeGeometry args={[HW, HH]} />
-        <meshStandardMaterial color="#0a0814" roughness={0.9} />
+        <meshStandardMaterial color={wallColor} roughness={0.8} />
       </mesh>
     </group>
   );
 }
 
 function CeilingLights() {
-  const zPositions = Array.from({ length: 6 }, (_, i) => -HD / 2 + 3 + i * 5);
+  const zPositions = Array.from({ length: 8 }, (_, i) => -HD / 2 + 2 + i * 5);
   return (
     <>
       {zPositions.map((z, i) => (
-        <group key={i} position={[0, HH - 0.05, z]}>
+        <group key={i} position={[0, HH - 0.1, z]}>
           <mesh>
-            <boxGeometry args={[1.2, 0.06, 0.3]} />
-            <meshStandardMaterial color="#ffe8cc" emissive="#ffe8cc" emissiveIntensity={1.8} />
+            <boxGeometry args={[1.5, 0.05, 0.4]} />
+            <meshStandardMaterial color="#fff0d0" emissive="#fff0d0" emissiveIntensity={1.5} />
           </mesh>
-          <pointLight position={[0, -0.2, 0]} intensity={12} distance={8} color="#fff5e0" />
+          <pointLight position={[0, -0.2, 0]} intensity={15} distance={10} color="#fff5e0" />
         </group>
       ))}
     </>
   );
 }
 
-function WallSconce({ position }: { position: [number, number, number] }) {
-  const t = useRef(Math.random() * Math.PI * 2);
-  const lightRef = useRef<THREE.PointLight>(null);
-  useFrame((_, delta) => {
-    t.current += delta;
-    if (lightRef.current) lightRef.current.intensity = 3 + Math.sin(t.current * 1.5) * 0.5;
-  });
-  return (
-    <group position={position}>
-      <mesh>
-        <boxGeometry args={[0.08, 0.22, 0.08]} />
-        <meshStandardMaterial color="#8b6914" metalness={0.7} roughness={0.3} />
-      </mesh>
-      <mesh position={[0, 0.18, 0.1]}>
-        <coneGeometry args={[0.12, 0.18, 12, 1, true]} />
-        <meshStandardMaterial color="#fff3cc" emissive="#fff3cc" emissiveIntensity={1.5} side={2} />
-      </mesh>
-      <pointLight ref={lightRef} position={[0, 0.1, 0.15]} intensity={3} distance={4} color="#ffc877" />
-    </group>
-  );
-}
-
-function OfficeDoor({ office, position, rotY, index }: { office: Office; position: [number, number, number]; rotY: number; index: number }) {
-  const [, navigate] = useLocation();
+function GalleryFrame({ story, position, rotY }: { story: MemberSuccess; position: [number, number, number]; rotY: number }) {
   const [hovered, setHovered] = useState(false);
   const glowRef = useRef<THREE.MeshStandardMaterial>(null);
-  const t = useRef(index * 1.2);
+  const t = useRef(Math.random() * Math.PI);
 
   useFrame((_, delta) => {
     t.current += delta;
     if (glowRef.current) {
-      glowRef.current.emissiveIntensity = (hovered ? 0.7 : 0.2) + Math.sin(t.current * 2) * 0.08;
+      glowRef.current.emissiveIntensity = (hovered ? 0.8 : 0.2) + Math.sin(t.current * 1.5) * 0.1;
     }
   });
 
-  const doorW = 1.4;
-  const doorH = 2.5;
-
-  const handleClick = () => {
-    if (office.isBreakroom && office.breakroomUrl) {
-      window.open(office.breakroomUrl, "_blank");
-    } else {
-      navigate(office.path);
-    }
-  };
+  const fw = 2.2;
+  const fh = 3.0;
+  const safeStoryUrl = getSafeExternalUrl(story.url);
+  const imageUrl = story.image
+    ? `${import.meta.env.BASE_URL}${story.image.replace(/^\//, "")}`
+    : null;
 
   return (
     <group position={position} rotation={[0, rotY, 0]}>
-      {/* Frame */}
-      <mesh position={[0, doorH / 2 + 0.12, 0]}>
-        <boxGeometry args={[doorW + 0.32, 0.24, 0.16]} />
-        <meshStandardMaterial ref={glowRef} color={office.accentColor} emissive={office.accentColor} emissiveIntensity={0.25} metalness={0.7} roughness={0.2} />
+      {/* Inner canvas */}
+      <mesh position={[0, fh / 2, 0.05]}>
+        <planeGeometry args={[fw - 0.2, fh - 0.2]} />
+        <meshStandardMaterial color="#0a0c10" roughness={0.6} />
       </mesh>
-      <mesh position={[-(doorW / 2 + 0.14), doorH / 2, 0]}>
-        <boxGeometry args={[0.24, doorH, 0.16]} />
-        <meshStandardMaterial color={office.accentColor} emissive={office.accentColor} emissiveIntensity={0.2} metalness={0.7} roughness={0.2} />
+      {imageUrl && (
+        <DreiImage
+          url={imageUrl}
+          position={[0, fh / 2 + 0.25, 0.07]}
+          scale={[fw - 0.35, fh - 0.85]}
+          transparent
+        />
+      )}
+
+      {/* Frame border */}
+      <mesh position={[0, fh / 2, 0.02]}>
+        <boxGeometry args={[fw, fh, 0.04]} />
+        <meshStandardMaterial ref={glowRef} color="#c8a050" emissive="#c8a050" emissiveIntensity={0.2} metalness={0.9} roughness={0.1} />
       </mesh>
-      <mesh position={[(doorW / 2 + 0.14), doorH / 2, 0]}>
-        <boxGeometry args={[0.24, doorH, 0.16]} />
-        <meshStandardMaterial color={office.accentColor} emissive={office.accentColor} emissiveIntensity={0.2} metalness={0.7} roughness={0.2} />
-      </mesh>
-      {/* Door panel */}
+
+      {/* Hover Glass */}
       <mesh
-        position={[0, doorH / 2, 0.05]}
-        onClick={handleClick}
-        onPointerOver={() => { setHovered(true); document.body.style.cursor = "pointer"; }}
+        position={[0, fh / 2, 0.08]}
+        onPointerOver={() => {
+          setHovered(true);
+          document.body.style.cursor = safeStoryUrl ? "pointer" : "default";
+        }}
         onPointerOut={() => { setHovered(false); document.body.style.cursor = "default"; }}
+        onClick={() => safeStoryUrl && window.open(safeStoryUrl, "_blank", "noopener,noreferrer")}
       >
-        <planeGeometry args={[doorW, doorH]} />
-        <meshStandardMaterial color={hovered ? "#1a2420" : "#0d0a12"} roughness={0.9} />
+        <planeGeometry args={[fw - 0.2, fh - 0.2]} />
+        <meshPhysicalMaterial color="#ffffff" transmission={0.9} opacity={1} transparent roughness={0.1} />
       </mesh>
-      {/* Door panels detail */}
-      <mesh position={[0, doorH * 0.68, 0.08]}>
-        <boxGeometry args={[doorW * 0.78, doorH * 0.28, 0.02]} />
-        <meshStandardMaterial color="#0a0814" roughness={0.95} />
-      </mesh>
-      <mesh position={[0, doorH * 0.28, 0.08]}>
-        <boxGeometry args={[doorW * 0.78, doorH * 0.35, 0.02]} />
-        <meshStandardMaterial color="#0a0814" roughness={0.95} />
-      </mesh>
-      {/* Knob */}
-      <mesh position={[doorW * 0.3, doorH * 0.45, 0.1]}>
-        <sphereGeometry args={[0.055, 10, 10]} />
-        <meshStandardMaterial color={office.accentColor} metalness={0.9} roughness={0.1} />
-      </mesh>
-      {/* Name plate */}
-      <Text position={[0, doorH + 0.45, 0.08]} fontSize={0.2} color={office.accentColor} anchorX="center" anchorY="middle" outlineWidth={0.008} outlineColor="#000">
-        {office.name}{office.isBreakroom ? " ☕" : ""}
+
+      {/* Text Content */}
+      <Text position={[0, imageUrl ? 0.32 : fh / 2 + 0.3, 0.09]} fontSize={0.18} color="#c8a050" anchorX="center" anchorY="middle" outlineWidth={0.005} outlineColor="#000" maxWidth={fw - 0.35} textAlign="center">
+        {story.memberName.toUpperCase()}
       </Text>
-      <Text position={[0, doorH + 0.16, 0.08]} fontSize={0.11} color="#888" anchorX="center" anchorY="middle">
-        {hovered ? (office.isBreakroom ? "Open site →" : "Enter office →") : office.title}
+      <Text position={[0, imageUrl ? 0.08 : fh / 2 - 0.2, 0.09]} fontSize={0.12} color="#aaa" anchorX="center" anchorY="middle" maxWidth={fw - 0.5} textAlign="center">
+        {story.caption}
       </Text>
+      <Text position={[0, 0.2, 0.09]} fontSize={0.09} color={story.url ? "#f3d58a" : "#686868"} anchorX="center" anchorY="middle">
+        {safeStoryUrl ? "SELECT TO VIEW STORY" : "AWAITING APPROVED STORY"}
+      </Text>
+
+      {/* Spotlight */}
+      <spotLight position={[0, fh + 1, 1]} target-position={[0, fh / 2, 0]} intensity={hovered ? 8 : 4} angle={0.4} penumbra={0.5} color="#fff5e0" />
+      <object3D position={[0, fh / 2, 0]} />
     </group>
   );
 }
 
-function EndWall() {
+function LobbyEntrance({ side, position }: { side: string; position: [number, number, number] }) {
+  const [, navigate] = useLocation();
+  const [hovered, setHovered] = useState(false);
+  const glowRef = useRef<THREE.MeshStandardMaterial>(null);
+  const t = useRef(0);
+
+  useFrame((_, delta) => {
+    t.current += delta;
+    if (glowRef.current) {
+      glowRef.current.emissiveIntensity = (hovered ? 0.9 : 0.4) + Math.sin(t.current * 2) * 0.15;
+    }
+  });
+
+  const w = 4;
+  const h = 3.5;
+
   return (
-    <group position={[0, HH / 2, -HD / 2 + 0.1]}>
-      <Text position={[0, 0.4, 0]} fontSize={0.3} color="#c8a050" anchorX="center" anchorY="middle" letterSpacing={0.15}>
-        NEXT LEVEL
+    <group position={position}>
+      {/* Grand Arch */}
+      <mesh position={[0, h / 2, 0]}>
+        <boxGeometry args={[w, h, 0.2]} />
+        <meshStandardMaterial ref={glowRef} color="#c8a050" emissive="#c8a050" emissiveIntensity={0.4} metalness={0.8} roughness={0.2} />
+      </mesh>
+
+      <mesh
+        position={[0, h / 2 - 0.2, 0.11]}
+        onClick={() => navigate(`/agent-lobby/${side}`)}
+        onPointerOver={() => { setHovered(true); document.body.style.cursor = "pointer"; }}
+        onPointerOut={() => { setHovered(false); document.body.style.cursor = "default"; }}
+      >
+        <planeGeometry args={[w - 0.4, h - 0.4]} />
+        <meshStandardMaterial color={hovered ? "#0d141f" : "#05070a"} roughness={0.9} />
+      </mesh>
+
+      <Text position={[0, h + 0.6, 0.1]} fontSize={0.3} color="#c8a050" anchorX="center" anchorY="middle" letterSpacing={0.1}>
+        AGENT LOBBY
       </Text>
-      <Text position={[0, -0.1, 0]} fontSize={0.16} color="#444" anchorX="center" anchorY="middle" letterSpacing={0.1}>
-        HEADQUARTERS
+      <Text position={[0, h / 2, 0.12]} fontSize={0.16} color={hovered ? "#fff" : "#aaa"} anchorX="center" anchorY="middle">
+        {hovered ? "Enter Lobby →" : "Proceed"}
       </Text>
     </group>
   );
@@ -175,65 +178,84 @@ function EndWall() {
 export default function HallwayPage() {
   const [, navigate] = useLocation();
   const { side } = useParams<{ side: string }>();
-  const offices = getHallwayOffices(side || "left");
   const isLeft = side === "left";
+  const webglSupported = canUseWebGL();
 
-  const wallColor = isLeft ? "#1a1428" : "#14181e";
-
-  const doorPositions = offices.map((_, i) => {
-    const isLeftDoor = i % 2 === 0;
-    const row = Math.floor(i / 2);
-    const z = -HD / 2 + 4 + row * 5;
-    const x = isLeftDoor ? -(HW / 2 - 0.08) : (HW / 2 - 0.08);
-    const rotY = isLeftDoor ? Math.PI / 2 : -Math.PI / 2;
-    return { x, z, rotY };
-  });
-
-  const sconcePositions: [number, number, number][] = doorPositions.map(({ x, z }) => [
-    x > 0 ? x - 0.2 : x + 0.2,
-    2.6,
-    z + 1.8,
-  ]);
+  const stories = MEMBER_SUCCESS_STORIES.filter(s => s.wing === (isLeft ? "left" : "right"));
+  const wallColor = isLeft ? "#12151c" : "#1a161b";
 
   return (
-    <div style={{ width: "100vw", height: "100vh", background: "#060410" }}>
-      <Canvas shadows camera={{ position: [0, 2.2, HD / 2 - 1], fov: 65, near: 0.1, far: 120 }} gl={{ antialias: true, alpha: false }}>
+    <div style={{ width: "100vw", height: "100vh", background: "#050608" }}>
+      {webglSupported ? <WebGLErrorBoundary>
+        <Canvas shadows camera={{ position: [0, 1.8, HD / 2 - 2], fov: 60, near: 0.1, far: 100 }} gl={{ antialias: true }}>
         <Suspense fallback={null}>
-          <ambientLight intensity={0.2} color="#2010a0" />
+          <ambientLight intensity={0.3} color="#ffe8cc" />
+
           <HallwayRoom wallColor={wallColor} />
           <CeilingLights />
-          {sconcePositions.map((pos, i) => <WallSconce key={i} position={pos} />)}
-          {offices.map((office, i) => (
-            <OfficeDoor
-              key={office.id}
-              office={office}
-              position={[doorPositions[i].x, 0, doorPositions[i].z]}
-              rotY={doorPositions[i].rotY}
-              index={i}
-            />
-          ))}
-          <EndWall />
+
+          {stories.map((story, i) => {
+            const isLeftWall = i % 2 === 0;
+            const row = Math.floor(i / 2);
+            // Space frames along the Z axis
+            const z = HD / 2 - 8 - row * 7;
+            const x = isLeftWall ? -(HW / 2 - 0.1) : (HW / 2 - 0.1);
+            const rotY = isLeftWall ? Math.PI / 2 : -Math.PI / 2;
+
+            return (
+              <GalleryFrame key={story.id} story={story} position={[x, 0, z]} rotY={rotY} />
+            );
+          })}
+
+          <LobbyEntrance side={side || "left"} position={[0, 0, -HD / 2 + 1]} />
+
           <OrbitControls
-            target={[0, 2, -5]}
+            target={[0, 2, -HD / 2]}
             minDistance={2}
-            maxDistance={16}
+            maxDistance={HD}
             minPolarAngle={0.05}
             maxPolarAngle={Math.PI / 2.05}
             enablePan={false}
             enableDamping
-            dampingFactor={0.08}
+            dampingFactor={0.05}
           />
         </Suspense>
-      </Canvas>
+        </Canvas>
+      </WebGLErrorBoundary> : <WebGLUnavailable />}
+
       <div style={{ position: "fixed", top: 14, left: 20, zIndex: 20, display: "flex", gap: 8 }}>
-        <button onClick={() => navigate("/")} style={{ padding: "9px 18px", borderRadius: 8, border: "1px solid rgba(200,160,80,0.4)", background: "rgba(200,160,80,0.12)", color: "#c8a050", cursor: "pointer", fontSize: 13, fontWeight: 600 }}>
-          ← Lobby
+        <button onClick={() => navigate("/")} className="btn">
+          ← Back to Main HQ
         </button>
       </div>
       <div style={{ position: "fixed", top: 14, right: 20, zIndex: 20 }}>
-        <div style={{ color: "#c8a050", fontSize: 12, letterSpacing: "2px" }}>
-          {isLeft ? "WING A" : "WING B"}
+        <div style={{ color: "#c8a050", fontSize: 13, letterSpacing: "2px", fontWeight: 600 }}>
+          {isLeft ? "WING A GALLERY" : "WING B GALLERY"}
         </div>
+      </div>
+      <div style={{ position: "fixed", right: 18, bottom: 18, zIndex: 20, display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 8 }}>
+        <button onClick={() => navigate(`/agent-lobby/${side || "left"}`)} className="btn">
+          Enter Agent Lobby
+        </button>
+        <details className="glass" style={{ width: "min(310px, calc(100vw - 36px))", padding: "10px 12px", color: "#e8e4d8" }}>
+          <summary style={{ cursor: "pointer", color: "#c8a050", fontSize: 12, fontWeight: 700, letterSpacing: "1px" }}>
+            MEMBER STORY LINKS
+          </summary>
+          <div style={{ display: "grid", gap: 7, marginTop: 10, maxHeight: "34vh", overflowY: "auto" }}>
+            {stories.map((story) => {
+              const safeUrl = getSafeExternalUrl(story.url);
+              return safeUrl ? (
+                <a key={story.id} href={safeUrl} target="_blank" rel="noopener noreferrer" className="btn" style={{ textDecoration: "none" }}>
+                  {story.memberName}
+                </a>
+              ) : (
+                <span key={story.id} style={{ padding: "7px 9px", border: "1px solid rgba(255,255,255,.08)", borderRadius: 7, color: "#858585", fontSize: 11 }}>
+                  {story.memberName} — awaiting approved story
+                </span>
+              );
+            })}
+          </div>
+        </details>
       </div>
     </div>
   );

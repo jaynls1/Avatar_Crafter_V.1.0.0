@@ -6,6 +6,8 @@ import CameraPage from "./pages/CameraPage";
 import AtlasOfficePage from "./pages/AtlasOfficePage";
 import TheatrePage from "./pages/TheatrePage";
 import HallwayPage from "./pages/HallwayPage";
+import AgentLobbyPage from "./pages/AgentLobbyPage";
+import GratitudePage from "./pages/GratitudePage";
 import OfficePage from "./pages/OfficePage";
 import "./index.css";
 
@@ -20,6 +22,8 @@ createRoot(document.getElementById("root")!).render(
         <Route path="/camera" component={CameraPage} />
         <Route path="/theatre" component={TheatrePage} />
         <Route path="/hallway/:side" component={HallwayPage} />
+        <Route path="/agent-lobby/:side" component={AgentLobbyPage} />
+        <Route path="/gratitude" component={GratitudePage} />
         <Route path="/atlas" component={AtlasOfficePage} />
         <Route path="/office/:id" component={OfficePage} />
         <Route component={App} />
