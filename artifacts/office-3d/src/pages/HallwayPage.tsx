@@ -6,7 +6,7 @@ import * as THREE from "three";
 import { getSafeExternalUrl, MEMBER_SUCCESS_STORIES, type MemberSuccess } from "../data/hallway";
 import WebGLErrorBoundary, { canUseWebGL, WebGLUnavailable } from "../components/WebGLErrorBoundary";
 
-const HW = 7;
+const HW = 12.5;
 const HH = 4.5;
 const HD = 40;
 
@@ -187,7 +187,7 @@ export default function HallwayPage() {
   return (
     <div style={{ width: "100vw", height: "100vh", background: "#050608" }}>
       {webglSupported ? <WebGLErrorBoundary>
-        <Canvas shadows camera={{ position: [0, 1.8, HD / 2 - 2], fov: 60, near: 0.1, far: 100 }} gl={{ antialias: true }}>
+        <Canvas shadows camera={{ position: [0, 1.8, HD / 2 - 2], fov: 65, near: 0.1, far: 100 }} gl={{ antialias: true }}>
         <Suspense fallback={null}>
           <ambientLight intensity={0.3} color="#ffe8cc" />
 
