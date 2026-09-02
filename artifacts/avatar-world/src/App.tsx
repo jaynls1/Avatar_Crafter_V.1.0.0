@@ -6,6 +6,10 @@ import { AgentSelector } from "./components/AgentSelector";
 import { WebGLFallback } from "./components/WebGLFallback";
 import { Walkthrough } from "./components/Walkthrough";
 import { useAuth } from "@workspace/replit-auth-web";
+import {
+  NEXT_LEVEL_PORTAL_URL,
+  VIRTUAL_OFFICE_URL,
+} from "./lib/trustedNavigation";
 
 function detectWebGL(): boolean {
   try {
@@ -83,6 +87,34 @@ function SpecialtyFilterBanner({
         }
       `}</style>
     </div>
+  );
+}
+
+function JourneyNavigation() {
+  return (
+    <nav className="next-journey-nav" aria-label="NEXT Level journey">
+      <div className="next-journey-nav__heading">
+        <span className="next-journey-nav__eyebrow">NEXT LEVEL JOURNEY</span>
+        <span className="next-journey-nav__copy">
+          Continue when you are ready.
+        </span>
+      </div>
+      <div className="next-journey-nav__actions">
+        <a
+          className="next-journey-nav__link next-journey-nav__link--primary"
+          href={VIRTUAL_OFFICE_URL}
+        >
+          Continue to Virtual Offices
+          <span aria-hidden="true">→</span>
+        </a>
+        <a
+          className="next-journey-nav__link next-journey-nav__link--secondary"
+          href={NEXT_LEVEL_PORTAL_URL}
+        >
+          Return to NEXT Level
+        </a>
+      </div>
+    </nav>
   );
 }
 
@@ -298,6 +330,9 @@ export default function App() {
       <div style={{ width: "100vw", height: "100vh", overflow: "hidden", background: "#010108", position: "relative" }}>
         {showWalkthrough && <Walkthrough onComplete={handleWalkthroughComplete} />}
         <HUD agentCount={agents.length} lobbyCount={lobbyAgents.length} />
+        {!EMBED_MODE && !selectedAgent && !highlightedSpecialty && (
+          <JourneyNavigation />
+        )}
         <div style={{ paddingTop: 70, height: "100%" }}>
           <WebGLFallback agents={agents} selectedAgent={selectedAgent} onSelect={handleSelectAgent} />
         </div>
@@ -350,6 +385,7 @@ export default function App() {
       {showWalkthrough && <Walkthrough onComplete={handleWalkthroughComplete} />}
 
       <HUD agentCount={agents.length} lobbyCount={lobbyAgents.length} />
+      {!selectedAgent && !highlightedSpecialty && <JourneyNavigation />}
 
       {/* Left sidebar — shows ALL agents for chat access; badges for lobby/office */}
       <AgentSelector
