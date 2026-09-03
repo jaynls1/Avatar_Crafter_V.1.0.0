@@ -1,0 +1,126 @@
+# Instincts generated from https://github.com/jaynls1/Avatar_Crafter_V.1.0.0
+# Generated: 2026-09-03T01:53:34.066Z
+# Version: 2.0
+# NOTE: This file supplements (does not replace) any existing curated instincts.
+# High-confidence manually curated instincts should be preserved alongside these.
+
+---
+id: Avatar_Crafter_V.1.0.0-commit-length
+trigger: "when writing a commit message"
+confidence: 0.6
+domain: git
+source: repo-analysis
+source_repo: https://github.com/jaynls1/Avatar_Crafter_V.1.0.0
+---
+
+# Avatar_Crafter_V.1.0.0 Commit Length
+
+## Action
+
+Keep commit messages concise (~45 characters)
+
+## Evidence
+
+- Average commit message length: 45 chars
+- Based on 14 commits
+
+---
+id: Avatar_Crafter_V.1.0.0-naming-files
+trigger: "when creating a new file"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: https://github.com/jaynls1/Avatar_Crafter_V.1.0.0
+---
+
+# Avatar_Crafter_V.1.0.0 Naming Files
+
+## Action
+
+Use PascalCase naming convention
+
+## Evidence
+
+- Analyzed file naming patterns in repository
+- Dominant pattern: PascalCase
+
+---
+id: Avatar_Crafter_V.1.0.0-import-relative
+trigger: "when importing modules"
+confidence: 0.75
+domain: code-style
+source: repo-analysis
+source_repo: https://github.com/jaynls1/Avatar_Crafter_V.1.0.0
+---
+
+# Avatar_Crafter_V.1.0.0 Import Relative
+
+## Action
+
+Use relative imports for project files
+
+## Evidence
+
+- Import analysis shows relative import pattern
+- Example: import { x } from '../lib/x'
+
+---
+id: Avatar_Crafter_V.1.0.0-export-style
+trigger: "when exporting from a module"
+confidence: 0.7
+domain: code-style
+source: repo-analysis
+source_repo: https://github.com/jaynls1/Avatar_Crafter_V.1.0.0
+---
+
+# Avatar_Crafter_V.1.0.0 Export Style
+
+## Action
+
+Prefer default exports
+
+## Evidence
+
+- Export pattern analysis
+- Dominant style: default
+
+---
+id: Avatar_Crafter_V.1.0.0-arch-type-based
+trigger: "when adding new code"
+confidence: 0.8
+domain: architecture
+source: repo-analysis
+source_repo: https://github.com/jaynls1/Avatar_Crafter_V.1.0.0
+---
+
+# Avatar_Crafter_V.1.0.0 Arch Type Based
+
+## Action
+
+Place code in the appropriate type folder (components/, services/, utils/, etc.)
+
+## Evidence
+
+- Type-based module organization detected
+- Folders: 
+
+---
+id: Avatar_Crafter_V.1.0.0-test-separate
+trigger: "when writing tests"
+confidence: 0.8
+domain: testing
+source: repo-analysis
+source_repo: https://github.com/jaynls1/Avatar_Crafter_V.1.0.0
+---
+
+# Avatar_Crafter_V.1.0.0 Test Separate
+
+## Action
+
+Place tests in the tests/ or __tests__/ directory, mirroring src structure
+
+## Evidence
+
+- Separate test directory pattern detected
+- Tests live in dedicated test folders
+
