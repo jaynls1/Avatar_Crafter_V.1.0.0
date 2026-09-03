@@ -3,6 +3,7 @@ import { Canvas, useFrame } from "@react-three/fiber";
 import { OrbitControls, Text } from "@react-three/drei";
 import { useLocation } from "wouter";
 import * as THREE from "three";
+import OfficeWallArt from "../../components/OfficeWallArt";
 
 const W = 13; const H = 4.2; const D = 13;
 
@@ -304,6 +305,7 @@ export default function HavenOffice() {
     <div style={{ width: "100vw", height: "100vh", background: "#1a1008" }}>
       <Canvas shadows camera={{ position: [0, 2.8, 6], fov: 60, near: 0.1, far: 80 }} gl={{ antialias: true, alpha: false }}>
         <Suspense fallback={null}>
+          <OfficeWallArt officeSlug="haven" />
           <ambientLight intensity={0.3} color="#ffcc88" />
           <HavenRoom />
           <Fireplace />
