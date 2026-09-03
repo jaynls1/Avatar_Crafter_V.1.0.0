@@ -10,6 +10,7 @@ import memoryRouter from "./memory";
 import officesRouter from "./offices";
 import hqScreenRouter from "./hqScreen";
 import visitorsRouter from "./visitors";
+import officeProductsRouter from "./officeProducts";
 
 const router: IRouter = Router();
 
@@ -18,6 +19,7 @@ router.use(authRouter);
 router.use(officesRouter);   // public — must come before adminRouter
 router.use(hqScreenRouter);  // public — before adminRouter
 router.use(visitorsRouter);  // public — before adminRouter
+router.use(officeProductsRouter); // authenticated wall-art proxy
 router.use(openaiRouter);
 router.use(agentsRouter);
 router.use(securityRouter);
