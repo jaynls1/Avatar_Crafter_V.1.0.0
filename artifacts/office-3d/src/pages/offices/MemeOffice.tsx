@@ -3,6 +3,7 @@ import { Canvas, useFrame } from "@react-three/fiber";
 import { OrbitControls, Text } from "@react-three/drei";
 import { useLocation } from "wouter";
 import * as THREE from "three";
+import OfficeWallArt from "../../components/OfficeWallArt";
 
 const W = 13; const H = 4.2; const D = 13;
 
@@ -173,6 +174,7 @@ export default function MemeOffice() {
     <div style={{ width: "100vw", height: "100vh", background: "#f8f0fc" }}>
       <Canvas shadows camera={{ position: [0, 2.8, 6], fov: 62, near: 0.1, far: 80 }} gl={{ antialias: true, alpha: false }}>
         <Suspense fallback={null}>
+          <OfficeWallArt officeSlug="meme" />
           <ambientLight intensity={0.9} color="#ffffff" />
           <directionalLight position={[3, 6, 3]} intensity={0.6} color="#fff8ff" castShadow />
           <MemeRoom />
