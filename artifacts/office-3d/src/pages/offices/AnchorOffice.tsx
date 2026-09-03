@@ -3,6 +3,7 @@ import { Canvas, useFrame } from "@react-three/fiber";
 import { OrbitControls, Text } from "@react-three/drei";
 import { useLocation } from "wouter";
 import * as THREE from "three";
+import OfficeWallArt from "../../components/OfficeWallArt";
 
 const W = 13; const H = 4.2; const D = 13;
 
@@ -209,6 +210,7 @@ export default function AnchorOffice() {
     <div style={{ width: "100vw", height: "100vh", background: "#030408" }}>
       <Canvas shadows camera={{ position: [0, 2.8, 6], fov: 60, near: 0.1, far: 80 }} gl={{ antialias: true, alpha: false }}>
         <Suspense fallback={null}>
+          <OfficeWallArt officeSlug="anchor" />
           <ambientLight intensity={0.2} color="#1020a0" />
           <pointLight position={[0, H - 0.4, 0]} intensity={10} distance={14} color="#818cf8" />
           <AnchorRoom />
