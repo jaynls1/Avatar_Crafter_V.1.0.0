@@ -160,14 +160,18 @@ export default function AboutPage({ onBack }: { onBack: () => void }) {
         {/* Ambient Grid */}
         <div className="absolute inset-0 holo-perspective-grid opacity-20 pointer-events-none"></div>
 
-        {/* Video Projector Base */}
-        <div className="absolute bottom-0 md:-bottom-[5%] left-1/2 -translate-x-1/2 w-[120%] md:w-[150%] h-[60%] md:h-[50%] z-10 mix-blend-screen pointer-events-none opacity-90">
-          <video
-            src={getAssetUrl('/about/hologram-projector.mp4')}
-            poster={getAssetUrl('/about/atlas-hologram-reference.png')}
-            autoPlay loop muted playsInline
-            className="w-full h-full object-contain"
-          />
+        {/* Ambient projector glow — character-free so only the active agent appears */}
+        <div
+          className="holo-projector-glow absolute bottom-0 md:-bottom-[5%] left-1/2 -translate-x-1/2 w-[120%] md:w-[150%] h-[60%] md:h-[50%] z-10 pointer-events-none"
+          aria-hidden="true"
+        >
+          <div className="holo-projector-glow__beam"></div>
+          <div className="holo-projector-glow__halo"></div>
+          <div className="holo-projector-glow__base">
+            <span></span>
+            <span></span>
+            <span></span>
+          </div>
         </div>
 
         {/* Hologram Images (Crossfading) */}

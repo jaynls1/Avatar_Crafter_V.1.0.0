@@ -396,6 +396,62 @@
 .holo-agent-effect { filter: grayscale(100%) sepia(100%) hue-rotate(130deg) saturate(400%) contrast(1.3) brightness(1.1) drop-shadow(0 0 15px rgba(0, 240, 255, 0.4)); mix-blend-mode: screen; }
 .holo-scanlines { background: repeating-linear-gradient(0deg, rgba(0, 240, 255, 0) 0px, rgba(0, 240, 255, 0.05) 2px, rgba(0, 240, 255, 0) 4px); }
 .holo-perspective-grid { background-image: linear-gradient(rgba(0, 240, 255, 0.15) 1px, transparent 1px), linear-gradient(90deg, rgba(0, 240, 255, 0.15) 1px, transparent 1px); background-size: 50px 50px; background-position: center; transform: perspective(1000px) rotateX(70deg) translateY(-20%) scale(2.5); transform-origin: top center; }
+.holo-projector-glow { mix-blend-mode: screen; opacity: 0.9; }
+.holo-projector-glow__beam {
+  position: absolute;
+  left: 50%;
+  bottom: 8%;
+  width: 48%;
+  height: 135%;
+  transform: translateX(-50%);
+  background: linear-gradient(to top, rgba(0, 240, 255, 0.22), rgba(0, 240, 255, 0.06) 58%, transparent 100%);
+  clip-path: polygon(38% 100%, 62% 100%, 100% 0, 0 0);
+  filter: blur(16px);
+  animation: holoGlowBreathe 4.5s ease-in-out infinite;
+}
+.holo-projector-glow__halo {
+  position: absolute;
+  left: 50%;
+  bottom: 2%;
+  width: 52%;
+  aspect-ratio: 2.8 / 1;
+  transform: translateX(-50%);
+  border-radius: 50%;
+  background: radial-gradient(ellipse, rgba(103, 232, 249, 0.44), rgba(0, 240, 255, 0.14) 42%, transparent 72%);
+  filter: blur(9px);
+  box-shadow: 0 0 45px rgba(0, 240, 255, 0.28);
+}
+.holo-projector-glow__base {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  width: 44%;
+  aspect-ratio: 3.2 / 1;
+  transform: translateX(-50%);
+}
+.holo-projector-glow__base span {
+  position: absolute;
+  inset: 0;
+  border: 1px solid rgba(103, 232, 249, 0.48);
+  border-radius: 50%;
+  box-shadow: inset 0 0 18px rgba(0, 240, 255, 0.16), 0 0 16px rgba(0, 240, 255, 0.2);
+}
+.holo-projector-glow__base span:nth-child(2) {
+  inset: 19% 10%;
+  border-color: rgba(103, 232, 249, 0.62);
+}
+.holo-projector-glow__base span:nth-child(3) {
+  inset: 38% 24%;
+  background: rgba(165, 243, 252, 0.28);
+  border-color: rgba(207, 250, 254, 0.8);
+}
+@keyframes holoGlowBreathe {
+  0%, 100% { opacity: 0.62; transform: translateX(-50%) scaleX(0.96); }
+  50% { opacity: 1; transform: translateX(-50%) scaleX(1.04); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .holo-projector-glow__beam { animation: none; }
+}
 .archive-scroll-wrapper::-webkit-scrollbar { width: 4px; }
 .archive-scroll-wrapper::-webkit-scrollbar-track { background: rgba(0,0,0,0.5); }
 .archive-scroll-wrapper::-webkit-scrollbar-thumb { background: rgba(0, 240, 255, 0.2); border-radius: 4px; }
