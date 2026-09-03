@@ -10,6 +10,7 @@ import Room, { ROOM_DIMS } from "../components/Room";
 import Furniture from "../components/Furniture";
 import PhotoAgent from "../components/PhotoAgent";
 import WallPoster from "../components/WallPoster";
+import atlasAvatarUrl from "../../../../attached_assets/Atlas_(3)_1788416552815.png";
 
 const { w, h, d } = ROOM_DIMS;
 
@@ -120,7 +121,7 @@ export default function AtlasOfficePage() {
           {posters.map(({ tool, position, rotation }) => (
             <WallPoster key={tool.id} tool={tool} position={position} rotation={rotation} />
           ))}
-          <PhotoAgent position={[2.5, 0, -1]} />
+          <PhotoAgent position={[2.5, 0, -1]} textureUrl={atlasAvatarUrl} />
           <HallwayBackDoor to="/" label="Main Office" />
           <CamRig view={camView} />
         </Suspense>

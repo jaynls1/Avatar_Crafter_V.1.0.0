@@ -9,23 +9,26 @@ const POSE_DURATIONS: Record<typeof POSE_KEYS[number], number> = {
   idle: 5, wave: 3.5, think: 4, point: 3, shrug: 3, walk: 3,
 };
 
-function useAvatarTextures() {
+function useAvatarTextures(textureUrl?: string) {
   const base = import.meta.env.BASE_URL;
-  const paths = POSE_KEYS.map((k) => `${base}avatars/${k}.png`);
+  const paths = textureUrl
+    ? [textureUrl]
+    : POSE_KEYS.map((k) => `${base}avatars/${k}.png`);
   const textures = useTexture(paths);
   return textures as THREE.Texture[];
 }
 
 interface PhotoAgentProps {
   position: [number, number, number];
+  textureUrl?: string;
 }
 
 const SPRITE_H = 1.95;
 const SPRITE_W = SPRITE_H * (683 / 1024);
 
-function AvatarSprite({ position }: PhotoAgentProps) {
+function AvatarSprite({ position, textureUrl }: PhotoAgentProps) {
   const { agentConfig, isSpeaking, currentMessage } = useStore();
-  const textures = useAvatarTextures();
+  const textures = useAvatarTextures(textureUrl);
   const { camera } = useThree();
 
   const meshRef = useRef<THREE.Mesh>(null);
@@ -49,23 +52,25 @@ function AvatarSprite({ position }: PhotoAgentProps) {
     poseTimer.current += delta;
     bobClock.current += delta;
 
-    const poseKey = POSE_KEYS[poseIdx.current];
-    const poseDuration = POSE_DURATIONS[poseKey];
+    if (textures.length > 1) {
+      const poseKey = POSE_KEYS[poseIdx.current];
+      const poseDuration = POSE_DURATIONS[poseKey];
 
-    if (!fadingOut.current && poseTimer.current >= poseDuration - 0.4) {
-      fadingOut.current = true;
-    }
+      if (!fadingOut.current && poseTimer.current >= poseDuration - 0.4) {
+        fadingOut.current = true;
+      }
 
-    if (fadingOut.current) {
-      opacity.current = Math.max(0, opacity.current - delta * 3.5);
-    }
+      if (fadingOut.current) {
+        opacity.current = Math.max(0, opacity.current - delta * 3.5);
+      }
 
-    if (fadingOut.current && opacity.current <= 0) {
-      poseIdx.current = (poseIdx.current + 1) % POSE_KEYS.length;
-      setCurrentTexture(textures[poseIdx.current]);
-      poseTimer.current = 0;
-      fadingOut.current = false;
-      opacity.current = 0;
+      if (fadingOut.current && opacity.current <= 0) {
+        poseIdx.current = (poseIdx.current + 1) % POSE_KEYS.length;
+        setCurrentTexture(textures[poseIdx.current]);
+        poseTimer.current = 0;
+        fadingOut.current = false;
+        opacity.current = 0;
+      }
     }
 
     if (!fadingOut.current) {
@@ -92,7 +97,14 @@ function AvatarSprite({ position }: PhotoAgentProps) {
         <meshBasicMaterial color="#000000" transparent opacity={0.22} />
       </mesh>
       <mesh ref={meshRef} position={[0, SPRITE_H / 2, 0]}>
-        <planeGeometry args={[SPRITE_W, SPRITE_H]} />
+        <planeGeometry
+          args={[
+            SPRITE_H *
+              ((currentTexture.image as { width?: number; height?: number })?.width ?? 683) /
+              ((currentTexture.image as { width?: number; height?: number })?.height ?? 1024),
+            SPRITE_H,
+          ]}
+        />
         <meshBasicMaterial
           map={currentTexture}
           transparent
@@ -131,6 +143,6 @@ function AvatarSprite({ position }: PhotoAgentProps) {
   );
 }
 
-export default function PhotoAgent({ position }: PhotoAgentProps) {
-  return <AvatarSprite position={position} />;
+export default function PhotoAgent({ position, textureUrl }: PhotoAgentProps) {
+  return <AvatarSprite position={position} textureUrl={textureUrl} />;
 }
