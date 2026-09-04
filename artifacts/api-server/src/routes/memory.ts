@@ -14,6 +14,11 @@ import { db } from "@workspace/db";
 import { conversations, messages } from "@workspace/db/schema";
 import { desc, eq } from "drizzle-orm";
 import { adminMiddleware } from "../middlewares/adminMiddleware";
+import { requireEntitlement } from "../middlewares/entitlementGuard";
+import {
+  AUTHORIZATION_ORGANIZATION,
+  CAPABILITIES,
+} from "../middlewares/routeAuthorization";
 import { saveConversationToNotion, getAgentDbId } from "../lib/notion-memory";
 import {
   isClickUpConfigured,
@@ -23,6 +28,10 @@ import {
 } from "../lib/clickup-memory";
 
 const memoryRouter = Router();
+memoryRouter.use(requireEntitlement(
+  AUTHORIZATION_ORGANIZATION,
+  CAPABILITIES.PRIVATE_MEMORY_READ,
+));
 memoryRouter.use(adminMiddleware);
 
 const AGENT_IDS = [

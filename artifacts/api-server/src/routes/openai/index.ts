@@ -5,24 +5,33 @@ import { conversations, messages } from "@workspace/db/schema";
 import { openai } from "@workspace/integrations-openai-ai-server";
 import { buildSystemPrompt } from "../../lib/agentPersonalities";
 import { scheduleNotionSync, scheduleClickUpScan } from "../../lib/memory-sync";
+import { requireEntitlement } from "../../middlewares/entitlementGuard";
+import {
+  AUTHORIZATION_ORGANIZATION,
+  canAccessConversationOwner,
+  CAPABILITIES,
+} from "../../middlewares/routeAuthorization";
 
 const openaiRouter = Router();
 
-function requireMember(req: any, res: any): string | null {
-  if (!req.isAuthenticated?.() || !req.user?.id) {
-    res.status(401).json({ error: "Authentication required" });
-    return null;
-  }
-  return String(req.user.id);
+function authenticatedMemberId(req: any): string {
+  return String(req.authorizationContext.userId);
 }
 
 function canAccessConversation(req: any, conversation: { userId: string | null }): boolean {
-  return !!req.user?.isAdmin || (!!conversation.userId && conversation.userId === String(req.user?.id));
+  return canAccessConversationOwner(
+    authenticatedMemberId(req),
+    conversation.userId,
+  );
 }
 
+openaiRouter.use(
+  "/openai/conversations",
+  requireEntitlement(AUTHORIZATION_ORGANIZATION, CAPABILITIES.CONVERSATIONS_USE),
+);
+
 openaiRouter.post("/openai/conversations", async (req, res) => {
-  const memberId = requireMember(req, res);
-  if (!memberId) return;
+  const memberId = authenticatedMemberId(req);
 
   const { title, agentId } = req.body;
   if (!title || !agentId) {
@@ -32,15 +41,14 @@ openaiRouter.post("/openai/conversations", async (req, res) => {
 
   const [conversation] = await db
     .insert(conversations)
-    .values({ title, agentId, userId: memberId, isAdmin: !!req.user?.isAdmin })
+    .values({ title, agentId, userId: memberId, isAdmin: !!(req as any).user?.isAdmin })
     .returning();
 
   res.status(201).json(conversation);
 });
 
 openaiRouter.get("/openai/conversations/:id", async (req, res) => {
-  const memberId = requireMember(req, res);
-  if (!memberId) return;
+  const memberId = authenticatedMemberId(req);
 
   const id = parseInt(req.params.id);
   if (isNaN(id)) {
@@ -68,8 +76,7 @@ openaiRouter.get("/openai/conversations/:id", async (req, res) => {
 });
 
 openaiRouter.post("/openai/conversations/:id/messages", async (req, res) => {
-  const memberId = requireMember(req, res);
-  if (!memberId) return;
+  const memberId = authenticatedMemberId(req);
 
   const id = parseInt(req.params.id);
   if (isNaN(id)) {

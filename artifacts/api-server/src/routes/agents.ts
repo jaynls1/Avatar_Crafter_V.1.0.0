@@ -1,4 +1,5 @@
 import { Router, type IRouter } from "express";
+import { authorizePublic, ROUTE_AUTHORIZATION_MATRIX } from "../middlewares/routeAuthorization";
 
 const router: IRouter = Router();
 const BACK_OFFICE_URL = process.env.BACK_OFFICE_URL;
@@ -19,7 +20,10 @@ const FALLBACK_AGENTS = [
   { codeName: "Rook",   fullName: "Rook",   role: "Security & Protection",   description: "Protects the systems, data, and integrity NEXT is built on.", color: "#4B5563", provider: "openai" },
 ];
 
-router.get("/agents", async (_req, res) => {
+router.get(
+  "/agents",
+  authorizePublic(ROUTE_AUTHORIZATION_MATRIX.biographies),
+  async (_req, res) => {
   if (!BACK_OFFICE_URL) {
     // No Back Office configured — return the built-in fallback roster
     res.json(FALLBACK_AGENTS);
@@ -36,6 +40,7 @@ router.get("/agents", async (_req, res) => {
   } catch (err) {
     res.status(502).json({ error: "Could not reach Back Office API" });
   }
-});
+  },
+);
 
 export default router;

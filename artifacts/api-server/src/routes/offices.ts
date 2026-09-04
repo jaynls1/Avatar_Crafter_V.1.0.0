@@ -2,6 +2,12 @@ import { Router, type IRouter } from "express";
 import { eq, and } from "drizzle-orm";
 import { db, officesTable } from "@workspace/db";
 import { sql } from "drizzle-orm";
+import {
+  AUTHORIZATION_ORGANIZATION,
+  officeEntitlementCode,
+} from "../middlewares/routeAuthorization";
+import { requireEntitlement } from "../middlewares/entitlementGuard";
+import { requireOfficeManager } from "../middlewares/officeManager";
 
 const router: IRouter = Router();
 
@@ -11,34 +17,10 @@ const router: IRouter = Router();
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, PATCH, DELETE, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, x-admin-key",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization, x-admin-key",
 };
 
 // ---------------------------------------------------------------------------
-// Admin-key guard for mutation endpoints (POST / PATCH / DELETE).
-// Fails closed: if AVATAR_CRAFTER_ADMIN_KEY is not configured, mutations are
-// rejected until the secret is set. GET remains public.
-// ---------------------------------------------------------------------------
-import type { Request, Response, NextFunction } from "express";
-import { timingSafeEqual } from "node:crypto";
-
-function requireAdminKey(req: Request, res: Response, next: NextFunction) {
-  Object.entries(CORS_HEADERS).forEach(([k, v]) => res.setHeader(k, v));
-  const expected = process.env.AVATAR_CRAFTER_ADMIN_KEY;
-  if (!expected) {
-    res.status(503).json({ error: "Admin key not configured on server" });
-    return;
-  }
-  const provided = req.header("x-admin-key") ?? "";
-  const a = Buffer.from(provided);
-  const b = Buffer.from(expected);
-  if (a.length !== b.length || !timingSafeEqual(a, b)) {
-    res.status(401).json({ error: "Invalid or missing x-admin-key" });
-    return;
-  }
-  next();
-}
-
 function setCors(res: ReturnType<typeof import("express").response.json>) {
   Object.entries(CORS_HEADERS).forEach(([k, v]) => res.setHeader(k, v));
 }
@@ -60,6 +42,10 @@ const SEED_OFFICES = [
   { slug: "haven",     name: "Haven",      description: "Sanctuary — Member Success",                 url: "/office-3d/office/haven",                        wing: "B", accentColor: "#f9a8d4" },
   { slug: "breakroom", name: "Breakroom",  description: "Take a breather — social lounge",           url: "https://the-break-room-project.vercel.app/",     wing: "B", accentColor: "#4ade80" },
 ];
+
+const CANONICAL_OFFICES = new Map(
+  SEED_OFFICES.map((office) => [office.slug, office] as const),
+);
 
 // ---------------------------------------------------------------------------
 // Bootstrap: create the offices table and seed it if empty.
@@ -109,9 +95,9 @@ function toPublic(row: typeof officesTable.$inferSelect) {
     slug:        row.slug,
     name:        row.name,
     description: row.description,
-    url:         row.url,
     wing:        row.wing,
     accentColor: row.accentColor,
+    requiresEntitlement: true,
     createdAt:   row.createdAt,
     updatedAt:   row.updatedAt,
   };
@@ -148,16 +134,46 @@ router.get("/offices", async (_req, res) => {
   }
 });
 
+// Resolve an office URL only after an explicit purchased-office entitlement
+// check. Public directory responses intentionally do not expose entry URLs.
+router.get(
+  "/offices/:slug/entry",
+  (req, res, next) => requireEntitlement(
+    AUTHORIZATION_ORGANIZATION,
+    officeEntitlementCode(String(req.params.slug)),
+  )(req, res, next),
+  async (req, res) => {
+    setCors(res as any);
+    try {
+      await bootstrap();
+      const slug = String(req.params.slug).toLowerCase();
+      const [office] = await db
+        .select()
+        .from(officesTable)
+        .where(and(eq(officesTable.slug, slug), eq(officesTable.isDeleted, false)))
+        .limit(1);
+      if (!office) {
+        res.status(404).json({ error: "Office not found" });
+        return;
+      }
+      res.json({ ...toPublic(office), url: office.url });
+    } catch (err) {
+      console.error("GET /api/offices/:slug/entry failed", err);
+      res.status(500).json({ error: "Failed to resolve office entry" });
+    }
+  },
+);
+
 // ---------------------------------------------------------------------------
 // POST /api/offices — create a new office
 // ---------------------------------------------------------------------------
-router.post("/offices", requireAdminKey, async (req, res) => {
+router.post("/offices", requireOfficeManager, async (req, res) => {
   Object.entries(CORS_HEADERS).forEach(([k, v]) => res.setHeader(k, v));
   try {
     const { slug, name, description = "", url, wing = "A", accentColor = "#4a9eff" } = req.body ?? {};
 
-    if (!slug || typeof slug !== "string" || !slug.trim()) {
-      res.status(400).json({ error: "slug is required" });
+    if (!slug || typeof slug !== "string" || !/^[a-z0-9-]+$/.test(slug.trim())) {
+      res.status(400).json({ error: "slug must contain only lowercase letters, numbers, and hyphens" });
       return;
     }
     if (!name || typeof name !== "string" || !name.trim()) {
@@ -205,11 +221,11 @@ router.post("/offices", requireAdminKey, async (req, res) => {
 // ---------------------------------------------------------------------------
 // PATCH /api/offices/:slug — partial update
 // ---------------------------------------------------------------------------
-router.patch("/offices/:slug", requireAdminKey, async (req, res) => {
+router.patch("/offices/:slug", requireOfficeManager, async (req, res) => {
   Object.entries(CORS_HEADERS).forEach(([k, v]) => res.setHeader(k, v));
   try {
     await bootstrap();
-    const { slug } = req.params;
+    const slug = String(req.params.slug);
 
     const [existing] = await db
       .select()
@@ -222,11 +238,13 @@ router.patch("/offices/:slug", requireAdminKey, async (req, res) => {
       return;
     }
 
-    const allowed = ["name", "description", "url", "wing", "accentColor"] as const;
+    const allowed = CANONICAL_OFFICES.has(slug)
+      ? ["description", "accentColor"] as const
+      : ["name", "description", "url", "wing", "accentColor"] as const;
     type AllowedKey = typeof allowed[number];
 
     // Map camelCase body keys to what the DB column is named via the ORM
-    const colMap: Record<AllowedKey, keyof typeof officesTable.$inferInsert> = {
+    const colMap: Record<AllowedKey, string> = {
       name:        "name",
       description: "description",
       url:         "url",
@@ -261,11 +279,16 @@ router.patch("/offices/:slug", requireAdminKey, async (req, res) => {
 // ---------------------------------------------------------------------------
 // DELETE /api/offices/:slug — soft-delete
 // ---------------------------------------------------------------------------
-router.delete("/offices/:slug", requireAdminKey, async (req, res) => {
+router.delete("/offices/:slug", requireOfficeManager, async (req, res) => {
   Object.entries(CORS_HEADERS).forEach(([k, v]) => res.setHeader(k, v));
   try {
     await bootstrap();
-    const { slug } = req.params;
+    const slug = String(req.params.slug);
+
+    if (CANONICAL_OFFICES.has(slug)) {
+      res.status(409).json({ error: "Canonical offices cannot be deleted" });
+      return;
+    }
 
     const [existing] = await db
       .select({ id: officesTable.id })

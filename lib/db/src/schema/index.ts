@@ -26,4 +26,3 @@ export * from "./memorySyncLog";
 export * from "./agentSettings";
 export * from "./visitors";
 export * from "./offices";
-export * from "./offices";

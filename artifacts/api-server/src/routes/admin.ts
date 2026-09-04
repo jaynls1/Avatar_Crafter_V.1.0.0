@@ -11,17 +11,26 @@ import { openai } from "@workspace/integrations-openai-ai-server";
 import { buildSystemPrompt, invalidatePromptCache, getAllMemorySettings, setMemoryEnabled } from "../lib/agentPersonalities";
 import { adminMiddleware } from "../middlewares/adminMiddleware";
 import { scheduleNotionSync, scheduleClickUpScan } from "../lib/memory-sync";
+import { requireEntitlement } from "../middlewares/entitlementGuard";
+import {
+  AUTHORIZATION_ORGANIZATION,
+  CAPABILITIES,
+} from "../middlewares/routeAuthorization";
 
 const adminRouter = Router();
 
 adminRouter.use(adminMiddleware);
+const requireAgentTools = requireEntitlement(
+  AUTHORIZATION_ORGANIZATION,
+  CAPABILITIES.AGENT_TOOLS_OPERATE,
+);
 
 const AGENT_IDS = [
   "Atlas", "Nova", "Sniper", "Meme", "Scribe", "Indy",
   "Rook", "Iggy", "Anchor", "Haven",
 ];
 
-adminRouter.get("/admin/agents", async (req, res) => {
+adminRouter.get("/admin/agents", requireAgentTools, async (req, res) => {
   const agentStatuses = await Promise.all(
     AGENT_IDS.map(async (agentId) => {
       const [lastConv] = await db
@@ -67,8 +76,8 @@ adminRouter.get("/admin/agents", async (req, res) => {
   res.json(agentStatuses);
 });
 
-adminRouter.get("/admin/conversations/:agentId", async (req, res) => {
-  const { agentId } = req.params;
+adminRouter.get("/admin/conversations/:agentId", requireAgentTools, async (req, res) => {
+  const agentId = String(req.params.agentId);
   const userId = req.user!.id;
 
   let [conv] = await db
@@ -105,17 +114,20 @@ adminRouter.get("/admin/conversations/:agentId", async (req, res) => {
   res.json({ ...conv, messages: msgs });
 });
 
-adminRouter.post("/admin/conversations/:agentId/messages", async (req, res) => {
-  const { agentId } = req.params;
-  const { content } = req.body;
-  const userId = req.user!.id;
+adminRouter.post(
+  "/admin/conversations/:agentId/messages",
+  requireAgentTools,
+  async (req, res) => {
+    const agentId = String(req.params.agentId);
+    const { content } = req.body;
+    const userId = req.user!.id;
 
-  if (!content) {
-    res.status(400).json({ error: "content is required" });
-    return;
-  }
+    if (!content) {
+      res.status(400).json({ error: "content is required" });
+      return;
+    }
 
-  let [conv] = await db
+    let [conv] = await db
     .select()
     .from(conversations)
     .where(
@@ -128,8 +140,8 @@ adminRouter.post("/admin/conversations/:agentId/messages", async (req, res) => {
     .orderBy(desc(conversations.createdAt))
     .limit(1);
 
-  if (!conv) {
-    [conv] = await db
+    if (!conv) {
+      [conv] = await db
       .insert(conversations)
       .values({
         title: `Admin: ${agentId}`,
@@ -138,7 +150,7 @@ adminRouter.post("/admin/conversations/:agentId/messages", async (req, res) => {
         isAdmin: true,
       })
       .returning();
-  }
+    }
 
   await db.insert(messages).values({
     conversationId: conv.id,
@@ -195,11 +207,12 @@ adminRouter.post("/admin/conversations/:agentId/messages", async (req, res) => {
   res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
   res.end();
 
-  scheduleNotionSync(conv.id, agentId, conv.title);
+  scheduleNotionSync(conv.id, agentId, conv.title, req.user!.id);
   scheduleClickUpScan(agentId, fullResponse, conv.id);
-});
+  },
+);
 
-adminRouter.post("/admin/broadcast", async (req, res) => {
+adminRouter.post("/admin/broadcast", requireAgentTools, async (req, res) => {
   const { instruction } = req.body;
   if (!instruction) {
     res.status(400).json({ error: "instruction is required" });

@@ -2,6 +2,8 @@ import { Router, type IRouter } from "express";
 import { desc } from "drizzle-orm";
 import { db, visitorsTable } from "@workspace/db";
 import { sql } from "drizzle-orm";
+import { authorizePublic, ROUTE_AUTHORIZATION_MATRIX } from "../middlewares/routeAuthorization";
+import { adminMiddleware } from "../middlewares/adminMiddleware";
 
 const router: IRouter = Router();
 
@@ -39,7 +41,10 @@ bootstrap().catch(e => console.error("[visitors] bootstrap failed:", e));
 router.options("/visitors", (_req, res) => { cors(res); res.sendStatus(204); });
 
 // GET /api/visitors → last 10 visitors
-router.get("/visitors", async (_req, res) => {
+router.get(
+  "/visitors",
+  adminMiddleware,
+  async (_req, res) => {
   cors(res);
   try {
     await bootstrap();
@@ -53,10 +58,14 @@ router.get("/visitors", async (_req, res) => {
     console.error("GET /api/visitors failed", err);
     res.status(500).json({ error: "Failed to fetch visitors" });
   }
-});
+  },
+);
 
 // POST /api/visitors → log a new visit
-router.post("/visitors", async (req, res) => {
+router.post(
+  "/visitors",
+  authorizePublic(ROUTE_AUTHORIZATION_MATRIX.entrance),
+  async (req, res) => {
   cors(res);
   try {
     await bootstrap();
@@ -81,6 +90,7 @@ router.post("/visitors", async (req, res) => {
     console.error("POST /api/visitors failed", err);
     res.status(500).json({ error: "Failed to log visitor" });
   }
-});
+  },
+);
 
 export default router;

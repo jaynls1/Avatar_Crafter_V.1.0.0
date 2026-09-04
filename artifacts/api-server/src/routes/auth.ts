@@ -6,7 +6,7 @@ import {
   ExchangeMobileAuthorizationCodeResponse,
   LogoutMobileSessionResponse,
 } from "@workspace/api-zod";
-import { db, usersTable } from "@workspace/db";
+import { db, externalIdentitiesTable, usersTable } from "@workspace/db";
 import {
   clearSession,
   getOidcConfig,
@@ -18,6 +18,13 @@ import {
   ISSUER_URL,
   type SessionData,
 } from "../lib/auth";
+import {
+  browserAuthorizationParameters,
+  callbackCredentials,
+  logoutBoundary,
+  mobileGrantChecks,
+  safeReturnTo,
+} from "../lib/oidcBoundary";
 
 const OIDC_COOKIE_TTL = 10 * 60 * 1000;
 
@@ -50,13 +57,6 @@ function setOidcCookie(res: Response, name: string, value: string) {
   });
 }
 
-function getSafeReturnTo(value: unknown): string {
-  if (typeof value !== "string" || !value.startsWith("/") || value.startsWith("//")) {
-    return "/";
-  }
-  return value;
-}
-
 async function upsertUser(claims: Record<string, unknown>) {
   const userData = {
     id: claims.sub as string,
@@ -68,18 +68,26 @@ async function upsertUser(claims: Record<string, unknown>) {
       | null,
   };
 
-  const [user] = await db
-    .insert(usersTable)
-    .values(userData)
-    .onConflictDoUpdate({
-      target: usersTable.id,
-      set: {
-        ...userData,
-        updatedAt: new Date(),
-      },
-    })
-    .returning();
-  return user;
+  return db.transaction(async (tx) => {
+    const [user] = await tx
+      .insert(usersTable)
+      .values(userData)
+      .onConflictDoUpdate({
+        target: usersTable.id,
+        set: { ...userData, updatedAt: new Date() },
+      })
+      .returning();
+    // This is only an OIDC identity/provider link. It deliberately does not
+    // add memberships, roles, admin flags, or entitlement state.
+    await tx.insert(externalIdentitiesTable).values({
+      issuer: ISSUER_URL, subject: user.id, userId: user.id,
+      providerConnected: true, providerVersion: 1,
+    }).onConflictDoUpdate({
+      target: [externalIdentitiesTable.issuer, externalIdentitiesTable.subject],
+      set: { userId: user.id, providerConnected: true, providerVersion: 1, lastSeenAt: new Date() },
+    });
+    return user;
+  });
 }
 
 router.get("/auth/user", (req: Request, res: Response) => {
@@ -94,22 +102,16 @@ router.get("/login", async (req: Request, res: Response) => {
   const config = await getOidcConfig();
   const callbackUrl = `${getOrigin(req)}/api/callback`;
 
-  const returnTo = getSafeReturnTo(req.query.returnTo);
+  const returnTo = safeReturnTo(req.query.returnTo);
 
   const state = oidc.randomState();
   const nonce = oidc.randomNonce();
   const codeVerifier = oidc.randomPKCECodeVerifier();
   const codeChallenge = await oidc.calculatePKCECodeChallenge(codeVerifier);
 
-  const redirectTo = oidc.buildAuthorizationUrl(config, {
-    redirect_uri: callbackUrl,
-    scope: "openid email profile offline_access",
-    code_challenge: codeChallenge,
-    code_challenge_method: "S256",
-    prompt: "login consent",
-    state,
-    nonce,
-  });
+  const redirectTo = oidc.buildAuthorizationUrl(config, browserAuthorizationParameters({
+    callbackUrl, state, nonce, codeChallenge,
+  }));
 
   setOidcCookie(res, "code_verifier", codeVerifier);
   setOidcCookie(res, "nonce", nonce);
@@ -129,7 +131,8 @@ router.get("/callback", async (req: Request, res: Response) => {
   const nonce = req.cookies?.nonce;
   const expectedState = req.cookies?.state;
 
-  if (!codeVerifier || !expectedState) {
+  const grantChecks = callbackCredentials({ codeVerifier, expectedState, nonce });
+  if (!grantChecks) {
     res.redirect("/api/login");
     return;
   }
@@ -140,18 +143,13 @@ router.get("/callback", async (req: Request, res: Response) => {
 
   let tokens: oidc.TokenEndpointResponse & oidc.TokenEndpointResponseHelpers;
   try {
-    tokens = await oidc.authorizationCodeGrant(config, currentUrl, {
-      pkceCodeVerifier: codeVerifier,
-      expectedNonce: nonce,
-      expectedState,
-      idTokenExpected: true,
-    });
+    tokens = await oidc.authorizationCodeGrant(config, currentUrl, grantChecks);
   } catch {
     res.redirect("/api/login");
     return;
   }
 
-  const returnTo = getSafeReturnTo(req.cookies?.return_to);
+  const returnTo = safeReturnTo(req.cookies?.return_to);
 
   res.clearCookie("code_verifier", { path: "/" });
   res.clearCookie("nonce", { path: "/" });
@@ -189,11 +187,12 @@ router.get("/callback", async (req: Request, res: Response) => {
 });
 
 router.get("/logout", async (req: Request, res: Response) => {
+  const boundary = logoutBoundary("browser-oidc");
   const config = await getOidcConfig();
   const origin = getOrigin(req);
 
   const sid = getSessionId(req);
-  await clearSession(res, sid);
+  if (boundary.clearLocal) await clearSession(res, sid);
 
   const endSessionUrl = oidc.buildEndSessionUrl(config, {
     client_id: process.env.REPL_ID!,
@@ -222,12 +221,9 @@ router.post(
       callbackUrl.searchParams.set("state", state);
       callbackUrl.searchParams.set("iss", ISSUER_URL);
 
-      const tokens = await oidc.authorizationCodeGrant(config, callbackUrl, {
-        pkceCodeVerifier: code_verifier,
-        expectedNonce: nonce ?? undefined,
-        expectedState: state,
-        idTokenExpected: true,
-      });
+      const tokens = await oidc.authorizationCodeGrant(config, callbackUrl, mobileGrantChecks({
+        codeVerifier: code_verifier, state, nonce,
+      }));
 
       const claims = tokens.claims();
       if (!claims) {
@@ -264,8 +260,9 @@ router.post(
 );
 
 router.post("/mobile-auth/logout", async (req: Request, res: Response) => {
+  const boundary = logoutBoundary("mobile-local");
   const sid = getSessionId(req);
-  if (sid) {
+  if (boundary.clearLocal && sid) {
     await deleteSession(sid);
   }
   res.json(LogoutMobileSessionResponse.parse({ success: true }));

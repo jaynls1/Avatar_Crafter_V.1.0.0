@@ -1,6 +1,8 @@
 import { Router, type IRouter } from "express";
 import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
+import { authorizePublic, ROUTE_AUTHORIZATION_MATRIX } from "../middlewares/routeAuthorization";
+import { requireOfficeManager } from "../middlewares/officeManager";
 
 const router: IRouter = Router();
 
@@ -36,21 +38,28 @@ bootstrap().catch(e => console.error("[hq-screen] bootstrap failed:", e));
 router.options("/hq-screen", (_req, res) => { cors(res); res.sendStatus(204); });
 
 // GET /api/hq-screen → { screenUrl: string | null }
-router.get("/hq-screen", async (_req, res) => {
+router.get(
+  "/hq-screen",
+  authorizePublic(ROUTE_AUTHORIZATION_MATRIX.limitedDemo),
+  async (_req, res) => {
   cors(res);
   try {
     await bootstrap();
     const rows = await db.execute(sql`SELECT screen_url FROM hq_settings WHERE id = 1`);
-    const row = (rows as any).rows?.[0] ?? rows?.[0];
+    const row = (rows as any).rows?.[0] ?? (rows as any)?.[0];
     res.json({ screenUrl: row?.screen_url ?? null });
   } catch (err) {
     console.error("GET /api/hq-screen failed", err);
     res.status(500).json({ error: "Failed to fetch HQ screen config" });
   }
-});
+  },
+);
 
 // PATCH /api/hq-screen → update screenUrl
-router.patch("/hq-screen", async (req, res) => {
+router.patch(
+  "/hq-screen",
+  requireOfficeManager,
+  async (req, res) => {
   cors(res);
   try {
     await bootstrap();
@@ -67,6 +76,7 @@ router.patch("/hq-screen", async (req, res) => {
     console.error("PATCH /api/hq-screen failed", err);
     res.status(500).json({ error: "Failed to update HQ screen config" });
   }
-});
+  },
+);
 
 export default router;

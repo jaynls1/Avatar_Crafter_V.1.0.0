@@ -10,11 +10,13 @@ import memoryRouter from "./memory";
 import officesRouter from "./offices";
 import hqScreenRouter from "./hqScreen";
 import visitorsRouter from "./visitors";
+import integrationsRouter from "./integrations";
 
 const router: IRouter = Router();
 
 router.use(healthRouter);
 router.use(authRouter);
+router.use(integrationsRouter);
 router.use(officesRouter);   // public — must come before adminRouter
 router.use(hqScreenRouter);  // public — before adminRouter
 router.use(visitorsRouter);  // public — before adminRouter

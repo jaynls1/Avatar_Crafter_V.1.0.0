@@ -1,8 +1,19 @@
 import { Router } from "express";
+import { requireEntitlement } from "../middlewares/entitlementGuard";
+import {
+  AUTHORIZATION_ORGANIZATION,
+  CAPABILITIES,
+} from "../middlewares/routeAuthorization";
 
 const securityRouter = Router();
 
-securityRouter.post("/security/email", async (req, res) => {
+securityRouter.post(
+  "/security/email",
+  requireEntitlement(
+    AUTHORIZATION_ORGANIZATION,
+    CAPABILITIES.ROOK_SECURITY_ADMIN,
+  ),
+  async (req, res) => {
   const { subject, message } = req.body as { subject?: string; message?: string };
 
   if (!subject?.trim() || !message?.trim()) {
@@ -102,6 +113,7 @@ securityRouter.post("/security/email", async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: "Failed to reach email provider" });
   }
-});
+  },
+);
 
 export default securityRouter;

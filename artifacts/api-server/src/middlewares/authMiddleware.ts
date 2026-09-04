@@ -9,6 +9,7 @@ import {
   updateSession,
   type SessionData,
 } from "../lib/auth";
+import { shouldRefreshProvider } from "../lib/oidcBoundary";
 
 declare global {
   namespace Express {
@@ -33,13 +34,16 @@ async function refreshIfExpired(
   const now = Math.floor(Date.now() / 1000);
   if (!session.expires_at || now <= session.expires_at) return session;
 
-  if (!session.refresh_token) return null;
+  // A tokenless destination session has no provider refresh boundary.
+  if (!shouldRefreshProvider(session, now)) {
+    return session.access_token || session.refresh_token ? null : session;
+  }
 
   try {
     const config = await getOidcConfig();
     const tokens = await oidc.refreshTokenGrant(
       config,
-      session.refresh_token,
+      session.refresh_token!,
     );
     session.access_token = tokens.access_token;
     session.refresh_token = tokens.refresh_token ?? session.refresh_token;

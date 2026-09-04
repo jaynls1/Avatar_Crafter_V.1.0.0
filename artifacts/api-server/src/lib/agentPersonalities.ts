@@ -17,11 +17,18 @@ export async function getAgentPersonalities(): Promise<Record<string, string>> {
   if (cachedPersonalities && Date.now() - cacheTimestamp < CACHE_TTL_MS) return cachedPersonalities;
   try {
     const res = await fetch(`${BACK_OFFICE_URL}/api/agents`);
-    const agents = await res.json();
+    const payload: unknown = await res.json();
+    const agents = Array.isArray(payload) ? payload : [];
     cachedPersonalities = {};
     cacheTimestamp = Date.now();
     for (const agent of agents) {
-      cachedPersonalities[agent.codeName] = agent.systemPrompt;
+      if (
+        typeof agent === "object" && agent !== null &&
+        "codeName" in agent && typeof agent.codeName === "string" &&
+        "systemPrompt" in agent && typeof agent.systemPrompt === "string"
+      ) {
+        cachedPersonalities[agent.codeName] = agent.systemPrompt;
+      }
     }
   } catch {
     if (!cachedPersonalities) cachedPersonalities = {};

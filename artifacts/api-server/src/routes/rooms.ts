@@ -2,8 +2,21 @@ import { Router, type Response, type IRouter } from "express";
 import { db, roomsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
+import { requireEntitlement } from "../middlewares/entitlementGuard";
+import {
+  AUTHORIZATION_ORGANIZATION,
+  officeEntitlementCode,
+} from "../middlewares/routeAuthorization";
+import { requireOfficeManager } from "../middlewares/officeManager";
 
 const router: IRouter = Router();
+const requireOfficeEntry = (req: Parameters<ReturnType<typeof requireEntitlement>>[0],
+  res: Parameters<ReturnType<typeof requireEntitlement>>[1],
+  next: Parameters<ReturnType<typeof requireEntitlement>>[2]) =>
+  requireEntitlement(
+    AUTHORIZATION_ORGANIZATION,
+    officeEntitlementCode(String(req.params.slug)),
+  )(req, res, next);
 
 // In-memory SSE client registry: slug → set of response objects
 const sseClients = new Map<string, Set<Response>>();
@@ -50,7 +63,7 @@ const DEFAULT_TOOLS = [
 ];
 
 // GET /api/rooms — list all rooms
-router.get("/rooms", async (_req, res) => {
+router.get("/rooms", requireOfficeManager, async (_req, res) => {
   try {
     const rooms = await db.select().from(roomsTable).orderBy(roomsTable.createdAt);
     res.json({ rooms });
@@ -61,7 +74,7 @@ router.get("/rooms", async (_req, res) => {
 });
 
 // POST /api/rooms — create a room
-router.post("/rooms", async (req, res) => {
+router.post("/rooms", requireOfficeManager, async (req, res) => {
   try {
     const body = z.object({
       slug: z.string().min(1).max(100),
@@ -91,8 +104,8 @@ router.post("/rooms", async (req, res) => {
 });
 
 // GET /api/rooms/:slug/events — SSE stream for live room updates
-router.get("/rooms/:slug/events", (req, res) => {
-  const { slug } = req.params;
+router.get("/rooms/:slug/events", requireOfficeEntry, (req, res) => {
+  const slug = String(req.params.slug);
 
   res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Cache-Control", "no-cache");
@@ -119,9 +132,9 @@ router.get("/rooms/:slug/events", (req, res) => {
 });
 
 // GET /api/rooms/:slug — get a single room (auto-creates "default")
-router.get("/rooms/:slug", async (req, res) => {
+router.get("/rooms/:slug", requireOfficeEntry, async (req, res): Promise<void> => {
   try {
-    const { slug } = req.params;
+    const slug = String(req.params.slug);
     const rooms = await db.select().from(roomsTable).where(eq(roomsTable.slug, slug));
     if (!rooms.length) {
       if (slug === "default") {
@@ -132,9 +145,11 @@ router.get("/rooms/:slug", async (req, res) => {
           furnitureConfig: DEFAULT_FURNITURE,
           tools: DEFAULT_TOOLS,
         }).returning();
-        return res.json({ room });
+        res.json({ room });
+        return;
       }
-      return res.status(404).json({ error: "Room not found" });
+      res.status(404).json({ error: "Room not found" });
+      return;
     }
     res.json({ room: rooms[0] });
   } catch (err) {
@@ -144,9 +159,9 @@ router.get("/rooms/:slug", async (req, res) => {
 });
 
 // PUT /api/rooms/:slug — update room and push live update via SSE
-router.put("/rooms/:slug", async (req, res) => {
+router.put("/rooms/:slug", requireOfficeManager, async (req, res): Promise<void> => {
   try {
-    const { slug } = req.params;
+    const slug = String(req.params.slug);
     const body = z.object({
       name: z.string().min(1).max(200).optional(),
       agentConfig: z.record(z.unknown()).optional(),
@@ -166,7 +181,10 @@ router.put("/rooms/:slug", async (req, res) => {
       .where(eq(roomsTable.slug, slug))
       .returning();
 
-    if (!rooms.length) return res.status(404).json({ error: "Room not found" });
+    if (!rooms.length) {
+      res.status(404).json({ error: "Room not found" });
+      return;
+    }
 
     // Push live update to all connected SSE clients for this room
     broadcast(slug, { type: "update", room: rooms[0] });
@@ -186,14 +204,15 @@ router.put("/rooms/:slug", async (req, res) => {
 const VALID_VIEWS = ["auto", "desk", "agent", "wall", "overhead", "wide"] as const;
 type CameraView = typeof VALID_VIEWS[number];
 
-router.post("/rooms/:slug/camera", (req, res) => {
-  const { slug } = req.params;
+router.post("/rooms/:slug/camera", requireOfficeManager, (req, res): void => {
+  const slug = String(req.params.slug);
   const { view } = req.body as { view?: string };
 
   if (!view || !(VALID_VIEWS as readonly string[]).includes(view)) {
-    return res.status(400).json({
+    res.status(400).json({
       error: `Invalid view. Must be one of: ${VALID_VIEWS.join(", ")}`,
     });
+    return;
   }
 
   broadcast(slug, { type: "camera", view: view as CameraView });
@@ -201,11 +220,14 @@ router.post("/rooms/:slug/camera", (req, res) => {
 });
 
 // DELETE /api/rooms/:slug
-router.delete("/rooms/:slug", async (req, res) => {
+router.delete("/rooms/:slug", requireOfficeManager, async (req, res): Promise<void> => {
   try {
-    const { slug } = req.params;
+    const slug = String(req.params.slug);
     const rooms = await db.delete(roomsTable).where(eq(roomsTable.slug, slug)).returning();
-    if (!rooms.length) return res.status(404).json({ error: "Room not found" });
+    if (!rooms.length) {
+      res.status(404).json({ error: "Room not found" });
+      return;
+    }
     // Notify any connected clients the room was deleted
     broadcast(slug, { type: "deleted", slug });
     res.json({ ok: true });
