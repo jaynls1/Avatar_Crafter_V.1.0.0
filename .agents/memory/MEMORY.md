@@ -1,2 +1,3 @@
 - [Git config edits are sandbox-blocked](git-config-restricted.md) — any write to .git/ (via git, sed, or direct file edit) is hard-blocked in this environment; fix remotes via Replit's Git pane UI, not code tools.
 - [Index/Indy are the same agent](index-indy-identity.md) — the `indy` and `index` sprite folders are byte-for-identical; canonical code ID is `index`; greeting says "I'm Index — or Indy".
+- [Offline identity activation boundary](offline-identity-activation-boundary.md) — build/review is allowed; credentials, migration, provider connection, member activation, and release need explicit authorization.
