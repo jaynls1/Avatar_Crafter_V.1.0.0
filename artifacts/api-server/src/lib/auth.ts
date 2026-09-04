@@ -12,6 +12,7 @@ import {
 import { and, eq, isNull, sql } from "drizzle-orm";
 import type { AuthUser } from "@workspace/api-zod";
 import { legacySessionCompatibility } from "./oidcBoundary";
+import { clearCsrfCookie } from "./csrf";
 
 export const ISSUER_URL = process.env.ISSUER_URL ?? "https://replit.com/oidc";
 export const SESSION_COOKIE = "sid";
@@ -25,6 +26,8 @@ export interface SessionData {
   /** Internal authorization metadata; never serialized in browser responses. */
   created_at?: number;
   session_version?: number;
+  identity_issuer?: string;
+  identity_subject?: string;
 }
 
 let oidcConfig: client.Configuration | null = null;
@@ -45,6 +48,9 @@ export async function createSession(data: SessionData): Promise<string> {
     refreshToken: data.refresh_token,
     expiresAt: data.expires_at ? new Date(data.expires_at * 1000) : undefined,
     provider: "replit",
+  }, undefined, {
+    issuer: data.identity_issuer ?? ISSUER_URL,
+    subject: data.identity_subject ?? data.user.id,
   });
 }
 
@@ -66,6 +72,7 @@ export async function createLocalSession(
     expiresAt?: Date;
   },
   familyId?: string,
+  identity?: { issuer: string; subject: string },
 ): Promise<string> {
   const secret = crypto.randomBytes(32).toString("base64url");
   return db.transaction(async (tx) => {
@@ -75,9 +82,20 @@ export async function createLocalSession(
         and(eq(sessionFamiliesTable.id, familyId), isNull(sessionFamiliesTable.revokedAt)),
       );
       if (!existing) throw new Error("Session family is revoked");
+      if (
+        identity &&
+        (existing.identityIssuer !== identity.issuer ||
+          existing.identitySubject !== identity.subject)
+      ) {
+        throw new Error("Session family identity mismatch");
+      }
       family = existing;
     } else {
-      [family] = await tx.insert(sessionFamiliesTable).values({ userId: user.id }).returning();
+      [family] = await tx.insert(sessionFamiliesTable).values({
+        userId: user.id,
+        identityIssuer: identity?.issuer,
+        identitySubject: identity?.subject,
+      }).returning();
     }
     const [session] = await tx.insert(localSessionsTable).values({
       secretHash: hashSecret(secret),
@@ -136,6 +154,8 @@ export async function getSession(sid: string): Promise<SessionData | null> {
         : undefined,
       created_at: Math.floor(row.session.createdAt.getTime() / 1000),
       session_version: row.session.version,
+      identity_issuer: row.family.identityIssuer ?? undefined,
+      identity_subject: row.family.identitySubject ?? undefined,
     };
   }
   // Compatibility path for sessions issued before local-session migration.
@@ -242,6 +262,7 @@ export async function clearSession(
 ): Promise<void> {
   if (sid) await deleteSession(sid);
   res.clearCookie(SESSION_COOKIE, { path: "/" });
+  clearCsrfCookie(res);
 }
 
 export function getSessionId(req: Request): string | undefined {

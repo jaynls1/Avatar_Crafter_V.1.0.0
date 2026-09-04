@@ -1,0 +1,123 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - identity-foundation-next-v1
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CI: "true"
+  PORT: "4173"
+  BASE_PATH: "/ci"
+  API_SERVER_PORT: "8080"
+  NEXT_IDENTITY_V1_ENABLED: "false"
+  NEXT_ENTITLEMENT_V1_ENABLED: "false"
+  NEXT_REVOCATION_V1_ENABLED: "false"
+  NEXT_DURABLE_RATE_LIMIT_ENABLED: "false"
+
+jobs:
+  quality:
+    name: Install, typecheck, test, and build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install exact dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck workspace
+        run: pnpm run typecheck
+
+      - name: Typecheck legacy Avatar Crafter references
+        run: pnpm exec tsc -b Avatar-Crafter-1/tsconfig.json --pretty false --force
+
+      - name: Run unit and route-matrix tests
+        run: pnpm test
+
+      - name: Build every workspace artifact
+        run: pnpm run build
+
+  postgres-security:
+    name: Disposable PostgreSQL security tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: identity_ci
+          POSTGRES_PASSWORD: identity_ci_password
+          POSTGRES_DB: identity_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U identity_ci -d identity_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      TEST_DATABASE_URL: postgresql://identity_ci:identity_ci_password@127.0.0.1:5432/identity_ci
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install exact dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build shared declarations
+        run: pnpm run typecheck:libs
+
+      - name: Run real migration, HTTP, replay, and isolation tests
+        run: pnpm run test:identity:postgres
+
+  secret-scan:
+    name: Redacted secret scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out complete history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Scan committed content without printing secret values
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_ENABLE_COMMENTS: "false"
+          GITLEAKS_ENABLE_SUMMARY: "false"

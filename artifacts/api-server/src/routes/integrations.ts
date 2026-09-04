@@ -8,18 +8,20 @@ import {
   externalIdentitiesTable,
   identityHandoffsTable,
   integrationEventsTable,
+  sessionFamiliesTable,
   revocationStateTable,
   usersTable,
 } from "@workspace/db";
 import { AssertionError, verifyIdentityAssertion } from "../lib/assertions";
 import { securityAudit } from "../lib/audit";
-import { createLocalSession, revokeAllSessions } from "../lib/auth";
+import { createLocalSession } from "../lib/auth";
 import { integrationSecurity } from "../middlewares/integrationSecurity";
 import {
   adapterEnabled, eventClaimsMatch, validateDestinationRegistry,
   identityTransactionCookie, readIdentityTransactionCookie,
 } from "../lib/identityCore";
 import { authenticateService } from "../lib/servicePrincipal";
+import { issueCsrfCookie } from "../lib/csrf";
 
 const router: IRouter = Router();
 const startSchema = z.object({
@@ -47,6 +49,7 @@ const eventSchema = z.object({
 const requestId = (res: Response) => String(res.getHeader("x-request-id"));
 const secretHash = (value: string) => crypto.createHash("sha256").update(value).digest("hex");
 const transactionCookie = "next_identity_tx";
+const IDENTITY_AUDIENCE = "avatar-crafter";
 type Destination = { returnTo: string; authorizeUrl?: string };
 function destinations(): Record<string, Destination> {
   try {
@@ -70,6 +73,24 @@ function failure(req: Request, res: Response, error: unknown) {
 }
 
 router.use("/next", integrationSecurity);
+
+router.get("/next/csrf/v1", (req, res) => {
+  const sid = req.cookies?.sid;
+  if (!sid || !req.isAuthenticated()) {
+    res.status(401).json({
+      error: { code: "authentication_required", requestId: requestId(res) },
+    });
+    return;
+  }
+  try {
+    issueCsrfCookie(res, sid);
+    res.sendStatus(204);
+  } catch {
+    res.status(503).json({
+      error: { code: "csrf_unavailable", requestId: requestId(res) },
+    });
+  }
+});
 
 router.post("/next/identity/v1/start", async (req, res) => {
   if (!adapterEnabled("identity")) return unavailable(res);
@@ -96,13 +117,17 @@ router.post("/next/identity/v1/start", async (req, res) => {
     });
     await securityAudit({ requestId: requestId(res), event: "identity.start", outcome: "accepted", detail: { destination: body.destination } });
     if (!target.authorizeUrl) throw new AssertionError("missing_authorize_url");
-    const origin = `${req.header("x-forwarded-proto") ?? "https"}://${req.header("x-forwarded-host") ?? req.header("host")}`;
-    const url = new URL(target.authorizeUrl, origin);
+    const url = new URL(target.authorizeUrl, "https://relative.invalid");
     url.searchParams.set("transaction", transaction);
     url.searchParams.set("nonce", nonce);
     // The browser receives only the registered source URL and non-identity
     // correlation material; state remains HttpOnly and never enters JS.
-    res.status(201).json({ authorize_url: target.authorizeUrl.startsWith("/") ? `${url.pathname}${url.search}` : url.href, request_id: requestId(res) });
+    res.status(201).json({
+      authorize_url: target.authorizeUrl.startsWith("/")
+        ? `${url.pathname}${url.search}${url.hash}`
+        : url.href,
+      request_id: requestId(res),
+    });
   } catch (error) {
     failure(req, res, error);
   }
@@ -117,12 +142,28 @@ router.post("/next/identity/v1/complete", async (req, res) => {
       .where(and(eq(identityHandoffsTable.secretHash, secretHash(body.transaction)), isNull(identityHandoffsTable.completedAt), gt(identityHandoffsTable.expiresAt, new Date())));
     if (!handoff) throw new AssertionError("invalid_handoff");
     const claims = verifyIdentityAssertion(body.assertion, {
-      audience: process.env.NEXT_IDENTITY_AUDIENCE ?? "avatar-crafter",
+      audience: IDENTITY_AUDIENCE,
       destination: `next.identity.v1:${handoff.destination}`,
       // The browser nonce is stored only as a hash; its hash is compared below.
     });
     if (secretHash(claims.nonce) !== handoff.nonceHash || !claims.jti) throw new AssertionError("invalid_nonce");
     await db.transaction(async (tx) => {
+      const [claimed] = await tx.update(identityHandoffsTable).set({
+        issuer: claims.iss,
+        subject: claims.sub,
+        assertionId: claims.jti,
+        completedAt: new Date(),
+      }).where(and(
+        eq(identityHandoffsTable.id, handoff.id),
+        isNull(identityHandoffsTable.completedAt),
+        gt(identityHandoffsTable.expiresAt, new Date()),
+      )).returning();
+      if (!claimed) throw new AssertionError("invalid_handoff");
+
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(
+        hashtext(${claims.iss}),
+        hashtext(${claims.sub})
+      )`);
       let [identity] = await tx.select().from(externalIdentitiesTable).where(and(
         eq(externalIdentitiesTable.issuer, claims.iss), eq(externalIdentitiesTable.subject, claims.sub),
       ));
@@ -133,8 +174,9 @@ router.post("/next/identity/v1/complete", async (req, res) => {
           issuer: claims.iss, subject: claims.sub, userId,
         }).returning();
       }
-      await tx.update(identityHandoffsTable).set({ issuer: claims.iss, subject: claims.sub, userId: identity.userId, assertionId: claims.jti, completedAt: new Date() })
-        .where(and(eq(identityHandoffsTable.id, handoff.id), isNull(identityHandoffsTable.completedAt)));
+      await tx.update(identityHandoffsTable)
+        .set({ userId: identity.userId })
+        .where(eq(identityHandoffsTable.id, claimed.id));
     });
     await securityAudit({ requestId: requestId(res), event: "identity.complete", outcome: "accepted", actor: `${claims.iss}:${claims.sub}`, detail: { issuer: claims.iss } });
     res.status(202).json({ accepted: true, request_id: requestId(res) });
@@ -156,8 +198,21 @@ router.post("/next/identity/v1/finish", async (req, res) => {
     if (!handoff?.userId || !destinations()[handoff.returnToKey]) throw new AssertionError("invalid_handoff");
     const [user] = await db.select().from(usersTable).where(eq(usersTable.id, handoff.userId));
     if (!user) throw new AssertionError("invalid_handoff");
-    const sid = await createLocalSession({ id: user.id, email: null, firstName: null, lastName: null, profileImageUrl: null, isAdmin: false });
+    const sid = await createLocalSession(
+      {
+        id: user.id,
+        email: null,
+        firstName: null,
+        lastName: null,
+        profileImageUrl: null,
+        isAdmin: false,
+      },
+      undefined,
+      undefined,
+      { issuer: handoff.issuer, subject: handoff.subject },
+    );
     res.cookie("sid", sid, { httpOnly: true, secure: true, sameSite: "lax", path: "/", maxAge: 604800000 });
+    issueCsrfCookie(res, sid);
     res.clearCookie(transactionCookie, { path: "/api/next/identity/v1" });
     await securityAudit({ requestId: requestId(res), event: "identity.finish", outcome: "accepted", detail: { destination: handoff.destination } });
     res.redirect(destinations()[handoff.returnToKey].returnTo);
@@ -175,7 +230,7 @@ async function consumeEvent(
     const body = eventSchema.parse(req.body);
     const destination = `next.${adapter}.v1`;
     const claims = verifyIdentityAssertion(body.assertion, {
-      audience: process.env.NEXT_EVENTS_AUDIENCE ?? "avatar-crafter",
+      audience: IDENTITY_AUDIENCE,
       destination,
       nonce: body.nonce,
     });
@@ -232,7 +287,18 @@ async function consumeEvent(
         });
         const [mapping] = await tx.select().from(externalIdentitiesTable)
           .where(and(eq(externalIdentitiesTable.issuer, claims.iss), eq(externalIdentitiesTable.subject, claims.sub)));
-        if (mapping) await revokeAllSessions(mapping.userId, data.reason);
+        if (mapping) {
+          await tx.update(sessionFamiliesTable).set({
+            revokedAt: new Date(),
+            revokeReason: (data.reason ?? "external_revocation").slice(0, 128),
+            version: sql`${sessionFamiliesTable.version} + 1`,
+            updatedAt: new Date(),
+          }).where(and(
+            eq(sessionFamiliesTable.userId, mapping.userId),
+            eq(sessionFamiliesTable.identityIssuer, claims.iss),
+            eq(sessionFamiliesTable.identitySubject, claims.sub),
+          ));
+        }
       }
       return true;
     });

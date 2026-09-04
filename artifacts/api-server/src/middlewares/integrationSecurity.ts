@@ -1,37 +1,102 @@
 import crypto from "node:crypto";
 import type { NextFunction, Request, Response } from "express";
+import {
+  integrationRateLimitRepository,
+  loadRateLimitConfiguration,
+  rateLimitKeyHash,
+  type RateLimitRepository,
+} from "../lib/integrationRateLimit";
+import { allowedCorsOrigins } from "../lib/corsPolicy";
+import { verifyCsrfToken } from "../lib/csrf";
 
-const windows = new Map<string, { count: number; reset: number }>();
+type IntegrationSecurityDependencies = {
+  repository: RateLimitRepository;
+  configuration: () => ReturnType<typeof loadRateLimitConfiguration>;
+  now: () => number;
+};
 
-export function integrationSecurity(req: Request, res: Response, next: NextFunction) {
+function reject(
+  res: Response,
+  status: number,
+  code: string,
+  requestId: string,
+) {
+  res.status(status).json({ error: { code, requestId } });
+}
+
+export function createIntegrationSecurity(
+  dependencies: IntegrationSecurityDependencies = {
+    repository: integrationRateLimitRepository,
+    configuration: () => loadRateLimitConfiguration(),
+    now: Date.now,
+  },
+) {
+  return async function integrationSecurity(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ) {
   const requestId = req.header("x-request-id")?.slice(0, 128) || crypto.randomUUID();
   res.setHeader("x-request-id", requestId);
-  const key = `${req.ip}:${req.path}`;
-  const now = Date.now();
-  const current = windows.get(key);
-  const bucket = !current || current.reset <= now ? { count: 1, reset: now + 60_000 } : current;
-  if (current && current.reset > now) bucket.count++;
-  windows.set(key, bucket);
-  if (bucket.count > 30) {
-    res.status(429).json({ error: { code: "rate_limited", requestId } });
-    return;
-  }
+
   const origin = req.header("origin");
-  if (origin) {
-    const configured = (process.env.NEXT_ALLOWED_ORIGINS ?? "").split(",").filter(Boolean);
-    const forwarded = req.header("x-forwarded-host") ?? req.header("host");
-    const ownOrigin = forwarded ? `${req.header("x-forwarded-proto") ?? "https"}://${forwarded}` : "";
-    if (origin !== ownOrigin && !configured.includes(origin)) {
-      res.status(403).json({ error: { code: "origin_rejected", requestId } });
+  if (origin && !allowedCorsOrigins().has(origin)) {
+      reject(res, 403, "origin_rejected", requestId);
       return;
-    }
   }
   const sidCookie = req.cookies?.sid;
   const csrfHeader = req.header("x-csrf-token");
   const csrfCookie = req.cookies?.next_csrf;
-  if (sidCookie && (!csrfHeader || !csrfCookie || csrfHeader !== csrfCookie)) {
-    res.status(403).json({ error: { code: "csrf_rejected", requestId } });
+  const unsafeMethod = !["GET", "HEAD", "OPTIONS"].includes(req.method);
+  if (
+    unsafeMethod &&
+    sidCookie &&
+    (!csrfHeader ||
+      !csrfCookie ||
+      csrfHeader !== csrfCookie ||
+      !verifyCsrfToken(sidCookie, csrfHeader))
+  ) {
+    reject(res, 403, "csrf_rejected", requestId);
     return;
   }
-  next();
+
+    const configuration = dependencies.configuration();
+    if (configuration.state === "disabled") {
+      next();
+      return;
+    }
+    if (configuration.state === "invalid") {
+      reject(res, 503, "rate_limiter_unavailable", requestId);
+      return;
+    }
+
+    try {
+      const clientAddress = req.socket.remoteAddress ?? "unknown";
+      const scope = req.path.slice(0, 128);
+      const keyHash = rateLimitKeyHash(
+        configuration.hashKey,
+        `${clientAddress}\n${scope}`,
+      );
+      const decision = await dependencies.repository.consume({
+        scope,
+        keyHash,
+        limit: configuration.limit,
+        windowSeconds: configuration.windowSeconds,
+      });
+      if (!decision.allowed) {
+        const retryAfter = Math.max(
+          1,
+          Math.ceil((decision.resetAt.getTime() - dependencies.now()) / 1000),
+        );
+        res.setHeader("retry-after", String(retryAfter));
+        reject(res, 429, "rate_limited", requestId);
+        return;
+      }
+      next();
+    } catch {
+      reject(res, 503, "rate_limiter_unavailable", requestId);
+    }
+  };
 }
+
+export const integrationSecurity = createIntegrationSecurity();

@@ -1,6 +1,17 @@
 import { useState, useEffect } from "react";
 
-const STEPS = [
+interface WalkthroughStep {
+  title: string;
+  emoji: string;
+  description: string;
+  tip: string;
+  action: string;
+  demo?: Array<{ icon: string; label: string; action: string }>;
+  code?: string;
+  roadmap?: Array<{ icon: string; label: string; desc: string }>;
+}
+
+const STEPS: WalkthroughStep[] = [
   {
     title: "Welcome to Your Agent World",
     emoji: "🌐",

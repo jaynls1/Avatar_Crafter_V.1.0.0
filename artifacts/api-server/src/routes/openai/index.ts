@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { Router, type Request } from "express";
 import { eq } from "drizzle-orm";
 import { db } from "@workspace/db";
 import { conversations, messages } from "@workspace/db/schema";
@@ -14,11 +14,17 @@ import {
 
 const openaiRouter = Router();
 
-function authenticatedMemberId(req: any): string {
-  return String(req.authorizationContext.userId);
+function authenticatedMemberId(req: Request): string {
+  if (!req.authorizationContext) {
+    throw new Error("authorization_context_required");
+  }
+  return req.authorizationContext.userId;
 }
 
-function canAccessConversation(req: any, conversation: { userId: string | null }): boolean {
+function canAccessConversation(
+  req: Request,
+  conversation: { userId: string | null },
+): boolean {
   return canAccessConversationOwner(
     authenticatedMemberId(req),
     conversation.userId,
@@ -41,7 +47,12 @@ openaiRouter.post("/openai/conversations", async (req, res) => {
 
   const [conversation] = await db
     .insert(conversations)
-    .values({ title, agentId, userId: memberId, isAdmin: !!(req as any).user?.isAdmin })
+    .values({
+      title,
+      agentId,
+      userId: memberId,
+      isAdmin: req.user?.isAdmin === true,
+    })
     .returning();
 
   res.status(201).json(conversation);

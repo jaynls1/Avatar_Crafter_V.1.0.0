@@ -5,10 +5,11 @@ import { authMiddleware } from "./middlewares/authMiddleware";
 import router from "./routes";
 import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
+import { credentialedCorsOptions } from "./lib/corsPolicy";
 
 const app: Express = express();
 
-app.use(cors({ credentials: true, origin: true }));
+app.use(cors(credentialedCorsOptions()));
 app.use(cookieParser());
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));

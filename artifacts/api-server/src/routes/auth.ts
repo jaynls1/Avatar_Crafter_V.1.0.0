@@ -25,6 +25,7 @@ import {
   mobileGrantChecks,
   safeReturnTo,
 } from "../lib/oidcBoundary";
+import { issueCsrfCookie } from "../lib/csrf";
 
 const OIDC_COOKIE_TTL = 10 * 60 * 1000;
 
@@ -183,6 +184,7 @@ router.get("/callback", async (req: Request, res: Response) => {
 
   const sid = await createSession(sessionData);
   setSessionCookie(res, sid);
+  issueCsrfCookie(res, sid);
   res.redirect(returnTo);
 });
 
@@ -253,7 +255,8 @@ router.post(
       const sid = await createSession(sessionData);
       res.json(ExchangeMobileAuthorizationCodeResponse.parse({ token: sid }));
     } catch (err) {
-      req.log.error({ err }, "Mobile token exchange error");
+      void err;
+      console.error("Mobile token exchange failed");
       res.status(500).json({ error: "Token exchange failed" });
     }
   },

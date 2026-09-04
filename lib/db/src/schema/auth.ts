@@ -2,6 +2,7 @@ import { sql } from "drizzle-orm";
 import {
   bigint,
   boolean,
+  check,
   index,
   integer,
   jsonb,
@@ -27,6 +28,8 @@ export const sessionsTable = pgTable(
 export const sessionFamiliesTable = pgTable("session_families", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull().references(() => usersTable.id, { onDelete: "cascade" }),
+  identityIssuer: varchar("identity_issuer", { length: 512 }),
+  identitySubject: varchar("identity_subject", { length: 512 }),
   version: integer("version").notNull().default(1),
   revokedAt: timestamp("revoked_at", { withTimezone: true }),
   revokeReason: varchar("revoke_reason", { length: 128 }),
@@ -177,6 +180,22 @@ export const securityAuditTable = pgTable("security_audit", {
   detail: jsonb("detail").notNull().default({}),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+export const integrationRateLimitBucketsTable = pgTable(
+  "integration_rate_limit_buckets",
+  {
+    scope: varchar("scope", { length: 128 }).notNull(),
+    keyHash: varchar("key_hash", { length: 64 }).notNull(),
+    windowStart: timestamp("window_start", { withTimezone: true }).notNull(),
+    count: integer("count").notNull().default(1),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.scope, table.keyHash, table.windowStart] }),
+    index("integration_rate_limit_buckets_updated_idx").on(table.updatedAt),
+    check("integration_rate_limit_buckets_count_positive", sql`${table.count} > 0`),
+  ],
+);
 
 // (IMPORTANT) This table is mandatory for Replit Auth, don't drop it.
 export const usersTable = pgTable("users", {

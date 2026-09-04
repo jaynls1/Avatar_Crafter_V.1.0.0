@@ -17,4 +17,320 @@ export declare const HealthCheckResponse: zod.ZodObject<{
 }, {
     status: string;
 }>;
+/**
+ * @summary Get the currently authenticated user
+ */
+export declare const GetCurrentAuthUserHeader: zod.ZodObject<{
+    Authorization: zod.ZodOptional<zod.ZodString>;
+}, "strip", zod.ZodTypeAny, {
+    Authorization?: string | undefined;
+}, {
+    Authorization?: string | undefined;
+}>;
+export declare const GetCurrentAuthUserResponse: zod.ZodObject<{
+    user: zod.ZodUnion<[zod.ZodObject<{
+        id: zod.ZodString;
+        email: zod.ZodNullable<zod.ZodString>;
+        firstName: zod.ZodNullable<zod.ZodString>;
+        lastName: zod.ZodNullable<zod.ZodString>;
+        profileImageUrl: zod.ZodNullable<zod.ZodString>;
+        isAdmin: zod.ZodDefault<zod.ZodBoolean>;
+    }, "strip", zod.ZodTypeAny, {
+        id: string;
+        email: string | null;
+        firstName: string | null;
+        lastName: string | null;
+        profileImageUrl: string | null;
+        isAdmin: boolean;
+    }, {
+        id: string;
+        email: string | null;
+        firstName: string | null;
+        lastName: string | null;
+        profileImageUrl: string | null;
+        isAdmin?: boolean | undefined;
+    }>, zod.ZodNull]>;
+}, "strip", zod.ZodTypeAny, {
+    user: {
+        id: string;
+        email: string | null;
+        firstName: string | null;
+        lastName: string | null;
+        profileImageUrl: string | null;
+        isAdmin: boolean;
+    } | null;
+}, {
+    user: {
+        id: string;
+        email: string | null;
+        firstName: string | null;
+        lastName: string | null;
+        profileImageUrl: string | null;
+        isAdmin?: boolean | undefined;
+    } | null;
+}>;
+/**
+ * @summary Start the browser OIDC login flow
+ */
+export declare const BeginBrowserLoginQueryParams: zod.ZodObject<{
+    returnTo: zod.ZodOptional<zod.ZodString>;
+}, "strip", zod.ZodTypeAny, {
+    returnTo?: string | undefined;
+}, {
+    returnTo?: string | undefined;
+}>;
+/**
+ * @summary Complete the browser OIDC login flow
+ */
+export declare const HandleBrowserLoginCallbackQueryParams: zod.ZodObject<{
+    code: zod.ZodOptional<zod.ZodString>;
+    state: zod.ZodOptional<zod.ZodString>;
+    iss: zod.ZodOptional<zod.ZodString>;
+}, "strip", zod.ZodTypeAny, {
+    code?: string | undefined;
+    state?: string | undefined;
+    iss?: string | undefined;
+}, {
+    code?: string | undefined;
+    state?: string | undefined;
+    iss?: string | undefined;
+}>;
+/**
+ * @summary Clear the session and begin OIDC logout
+ */
+export declare const LogoutBrowserSessionHeader: zod.ZodObject<{
+    Authorization: zod.ZodOptional<zod.ZodString>;
+}, "strip", zod.ZodTypeAny, {
+    Authorization?: string | undefined;
+}, {
+    Authorization?: string | undefined;
+}>;
+/**
+ * @summary Exchange a mobile OIDC code for a session token
+ */
+export declare const ExchangeMobileAuthorizationCodeBody: zod.ZodObject<{
+    code: zod.ZodString;
+    code_verifier: zod.ZodString;
+    redirect_uri: zod.ZodString;
+    state: zod.ZodString;
+    nonce: zod.ZodOptional<zod.ZodString>;
+}, "strip", zod.ZodTypeAny, {
+    code: string;
+    state: string;
+    code_verifier: string;
+    redirect_uri: string;
+    nonce?: string | undefined;
+}, {
+    code: string;
+    state: string;
+    code_verifier: string;
+    redirect_uri: string;
+    nonce?: string | undefined;
+}>;
+export declare const ExchangeMobileAuthorizationCodeResponse: zod.ZodObject<{
+    token: zod.ZodString;
+}, "strip", zod.ZodTypeAny, {
+    token: string;
+}, {
+    token: string;
+}>;
+/**
+ * @summary List all conversations
+ */
+export declare const ListOpenaiConversationsResponseItem: zod.ZodObject<{
+    id: zod.ZodNumber;
+    title: zod.ZodString;
+    agentId: zod.ZodString;
+    createdAt: zod.ZodDate;
+}, "strip", zod.ZodTypeAny, {
+    id: number;
+    title: string;
+    agentId: string;
+    createdAt: Date;
+}, {
+    id: number;
+    title: string;
+    agentId: string;
+    createdAt: Date;
+}>;
+export declare const ListOpenaiConversationsResponse: zod.ZodArray<zod.ZodObject<{
+    id: zod.ZodNumber;
+    title: zod.ZodString;
+    agentId: zod.ZodString;
+    createdAt: zod.ZodDate;
+}, "strip", zod.ZodTypeAny, {
+    id: number;
+    title: string;
+    agentId: string;
+    createdAt: Date;
+}, {
+    id: number;
+    title: string;
+    agentId: string;
+    createdAt: Date;
+}>, "many">;
+/**
+ * @summary Create a new conversation
+ */
+export declare const CreateOpenaiConversationBody: zod.ZodObject<{
+    title: zod.ZodString;
+    agentId: zod.ZodString;
+}, "strip", zod.ZodTypeAny, {
+    title: string;
+    agentId: string;
+}, {
+    title: string;
+    agentId: string;
+}>;
+/**
+ * @summary Get conversation with messages
+ */
+export declare const GetOpenaiConversationParams: zod.ZodObject<{
+    id: zod.ZodNumber;
+}, "strip", zod.ZodTypeAny, {
+    id: number;
+}, {
+    id: number;
+}>;
+export declare const GetOpenaiConversationResponse: zod.ZodObject<{
+    id: zod.ZodNumber;
+    title: zod.ZodString;
+    agentId: zod.ZodString;
+    createdAt: zod.ZodDate;
+    messages: zod.ZodArray<zod.ZodObject<{
+        id: zod.ZodNumber;
+        conversationId: zod.ZodNumber;
+        role: zod.ZodString;
+        content: zod.ZodString;
+        createdAt: zod.ZodDate;
+    }, "strip", zod.ZodTypeAny, {
+        id: number;
+        createdAt: Date;
+        conversationId: number;
+        role: string;
+        content: string;
+    }, {
+        id: number;
+        createdAt: Date;
+        conversationId: number;
+        role: string;
+        content: string;
+    }>, "many">;
+}, "strip", zod.ZodTypeAny, {
+    id: number;
+    title: string;
+    agentId: string;
+    createdAt: Date;
+    messages: {
+        id: number;
+        createdAt: Date;
+        conversationId: number;
+        role: string;
+        content: string;
+    }[];
+}, {
+    id: number;
+    title: string;
+    agentId: string;
+    createdAt: Date;
+    messages: {
+        id: number;
+        createdAt: Date;
+        conversationId: number;
+        role: string;
+        content: string;
+    }[];
+}>;
+/**
+ * @summary Delete a conversation
+ */
+export declare const DeleteOpenaiConversationParams: zod.ZodObject<{
+    id: zod.ZodNumber;
+}, "strip", zod.ZodTypeAny, {
+    id: number;
+}, {
+    id: number;
+}>;
+/**
+ * @summary List messages in a conversation
+ */
+export declare const ListOpenaiMessagesParams: zod.ZodObject<{
+    id: zod.ZodNumber;
+}, "strip", zod.ZodTypeAny, {
+    id: number;
+}, {
+    id: number;
+}>;
+export declare const ListOpenaiMessagesResponseItem: zod.ZodObject<{
+    id: zod.ZodNumber;
+    conversationId: zod.ZodNumber;
+    role: zod.ZodString;
+    content: zod.ZodString;
+    createdAt: zod.ZodDate;
+}, "strip", zod.ZodTypeAny, {
+    id: number;
+    createdAt: Date;
+    conversationId: number;
+    role: string;
+    content: string;
+}, {
+    id: number;
+    createdAt: Date;
+    conversationId: number;
+    role: string;
+    content: string;
+}>;
+export declare const ListOpenaiMessagesResponse: zod.ZodArray<zod.ZodObject<{
+    id: zod.ZodNumber;
+    conversationId: zod.ZodNumber;
+    role: zod.ZodString;
+    content: zod.ZodString;
+    createdAt: zod.ZodDate;
+}, "strip", zod.ZodTypeAny, {
+    id: number;
+    createdAt: Date;
+    conversationId: number;
+    role: string;
+    content: string;
+}, {
+    id: number;
+    createdAt: Date;
+    conversationId: number;
+    role: string;
+    content: string;
+}>, "many">;
+/**
+ * @summary Send a text message and receive a streaming text response
+ */
+export declare const SendOpenaiMessageParams: zod.ZodObject<{
+    id: zod.ZodNumber;
+}, "strip", zod.ZodTypeAny, {
+    id: number;
+}, {
+    id: number;
+}>;
+export declare const SendOpenaiMessageBody: zod.ZodObject<{
+    content: zod.ZodString;
+}, "strip", zod.ZodTypeAny, {
+    content: string;
+}, {
+    content: string;
+}>;
+/**
+ * @summary Delete a mobile session token
+ */
+export declare const LogoutMobileSessionHeader: zod.ZodObject<{
+    Authorization: zod.ZodOptional<zod.ZodString>;
+}, "strip", zod.ZodTypeAny, {
+    Authorization?: string | undefined;
+}, {
+    Authorization?: string | undefined;
+}>;
+export declare const LogoutMobileSessionResponse: zod.ZodObject<{
+    success: zod.ZodBoolean;
+}, "strip", zod.ZodTypeAny, {
+    success: boolean;
+}, {
+    success: boolean;
+}>;
 //# sourceMappingURL=api.d.ts.map

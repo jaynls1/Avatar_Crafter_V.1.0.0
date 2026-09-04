@@ -36,8 +36,13 @@ export async function resolveAuthorizationContext(
 ): Promise<AuthorizationContext | null> {
   const session = await getSession(getSessionId(req) ?? "");
   if (!session) return null;
+  if (!session.identity_issuer || !session.identity_subject) return null;
   const [identity] = await db.select().from(externalIdentitiesTable)
-    .where(eq(externalIdentitiesTable.userId, session.user.id));
+    .where(and(
+      eq(externalIdentitiesTable.issuer, session.identity_issuer),
+      eq(externalIdentitiesTable.subject, session.identity_subject),
+      eq(externalIdentitiesTable.userId, session.user.id),
+    ));
   if (!identity) return null;
   const qualifiedSubject = `${identity.issuer}|${identity.subject}`;
   const [[membership], [entitlement], [revocation]] = await Promise.all([

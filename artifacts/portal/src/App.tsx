@@ -16,6 +16,36 @@ import BackOffice from "./pages/BackOffice";
 import nextNLogoImg from "./assets/next_n_logo.png";
 import teamPhotoImg from "./assets/team_photo.png";
 
+interface SpeechRecognitionResultEventLike {
+  readonly results: {
+    readonly length: number;
+    readonly [index: number]: {
+      readonly 0: { readonly transcript: string };
+    };
+  };
+}
+
+interface SpeechRecognitionLike {
+  lang: string;
+  interimResults: boolean;
+  continuous: boolean;
+  onstart: (() => void) | null;
+  onresult: ((event: SpeechRecognitionResultEventLike) => void) | null;
+  onend: (() => void) | null;
+  onerror: (() => void) | null;
+  start(): void;
+  stop(): void;
+}
+
+type SpeechRecognitionConstructor = new () => SpeechRecognitionLike;
+
+interface SpeechRecognitionWindow {
+  SpeechRecognition?: SpeechRecognitionConstructor;
+  webkitSpeechRecognition?: SpeechRecognitionConstructor;
+}
+
+const speechRecognitionWindow = window as typeof window & SpeechRecognitionWindow;
+
 const nextNLogo: string = nextNLogoImg;
 const teamPhoto: string = teamPhotoImg;
 const novaVideo: string | null = null;
@@ -877,13 +907,15 @@ function NovaGreeting({ onEnterLobby }: { onEnterLobby: () => void }) {
   const [gestureSet, setGestureSet] = useState<GestureSet>("calm");
   const [convId, setConvId] = useState<number | null>(null);
   const [isListening, setIsListening] = useState(false);
-  const [voiceSupported] = useState(() => !!(window.SpeechRecognition || (window as any).webkitSpeechRecognition));
-  const recognitionRef = useRef<any>(null);
+  const [voiceSupported] = useState(
+    () => !!(speechRecognitionWindow.SpeechRecognition || speechRecognitionWindow.webkitSpeechRecognition),
+  );
+  const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
 
   const startVoice = () => {
-    const SR = window.SpeechRecognition || (window as any).webkitSpeechRecognition;
+    const SR = speechRecognitionWindow.SpeechRecognition || speechRecognitionWindow.webkitSpeechRecognition;
     if (!SR) return;
     if (isListening) {
       recognitionRef.current?.stop();
@@ -896,9 +928,9 @@ function NovaGreeting({ onEnterLobby }: { onEnterLobby: () => void }) {
     rec.interimResults = true;
     rec.continuous = false;
     rec.onstart = () => setIsListening(true);
-    rec.onresult = (e: any) => {
-      const transcript = Array.from(e.results as any[])
-        .map((r: any) => r[0].transcript)
+    rec.onresult = (event) => {
+      const transcript = Array.from({ length: event.results.length }, (_, index) => event.results[index])
+        .map((result) => result[0].transcript)
         .join("");
       setInput(transcript);
     };

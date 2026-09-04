@@ -7,6 +7,12 @@ import * as THREE from "three";
 const W = 13; const H = 4.2; const D = 13;
 
 function HavenRoom() {
+  const walls: Array<[number, [number, number]]> = [
+    [-D / 2, [0, 0]],
+    [0, [Math.PI / 2, -(W / 2)]],
+    [0, [-Math.PI / 2, W / 2]],
+  ];
+
   return (
     <group>
       <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
@@ -17,8 +23,8 @@ function HavenRoom() {
         <planeGeometry args={[W, D]} />
         <meshStandardMaterial color="#d8d0c4" roughness={0.9} />
       </mesh>
-      {[[-D / 2, [0, 0]], [0, [Math.PI / 2, -(W / 2)]], [0, [-Math.PI / 2, W / 2]]].map(([z, [ry, x]], i) => (
-        <mesh key={i} rotation={[0, ry as number, 0]} position={[(x as number) || 0, H / 2, (z as number) || 0]}>
+      {walls.map(([z, [ry, x]], i) => (
+        <mesh key={i} rotation={[0, ry, 0]} position={[x || 0, H / 2, z || 0]}>
           <planeGeometry args={[i === 0 ? W : D, H]} />
           <meshStandardMaterial color={i === 0 ? "#e8e0d4" : "#ddd5c8"} roughness={0.88} />
         </mesh>

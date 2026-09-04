@@ -7,7 +7,9 @@
     "dev": "NODE_ENV=development tsx ./src/index.ts",
     "build": "tsx ./build.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test:identity": "node --import tsx --test src/lib/identity.test.ts src/lib/oidcBoundary.test.ts src/middlewares/accessPolicy.test.ts"
+    "test": "pnpm run test:identity",
+    "test:identity": "node --import tsx --test src/lib/identity.test.ts src/lib/integrationRateLimit.test.ts src/lib/oidcBoundary.test.ts src/middlewares/accessPolicy.test.ts",
+    "test:identity:postgres": "node --import tsx --test --test-concurrency=1 src/lib/identity.postgres.test.ts"
   },
   "dependencies": {
     "@replit/connectors-sdk": "^0.4.1",

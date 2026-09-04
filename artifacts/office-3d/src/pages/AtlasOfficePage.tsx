@@ -3,7 +3,8 @@ import { Canvas, useFrame } from "@react-three/fiber";
 import { OrbitControls, Text } from "@react-three/drei";
 import { useLocation } from "wouter";
 import * as THREE from "three";
-import { useStore } from "../store/useStore";
+import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
+import { useStore, type ToolConfig } from "../store/useStore";
 import { useRoomEvents } from "../hooks/useRoomEvents";
 import type { CameraView } from "../hooks/useRoomEvents";
 import Room, { ROOM_DIMS } from "../components/Room";
@@ -14,7 +15,7 @@ import atlasAvatarUrl from "../../../../attached_assets/Atlas_(3)_1788416552815.
 
 const { w, h, d } = ROOM_DIMS;
 
-function buildAtlasPosters(tools: ReturnType<typeof useStore>["tools"]) {
+function buildAtlasPosters(tools: ToolConfig[]) {
   const posters: { tool: typeof tools[0]; position: [number, number, number]; rotation: [number, number, number] }[] = [];
   const backWall = tools.slice(0, 5);
   const spacing = (w - 2) / (backWall.length + 1);
@@ -43,7 +44,7 @@ const CAM_VIEWS: Record<CameraView, CamState> = {
 };
 
 function CamRig({ view }: { view: CameraView }) {
-  const controlsRef = useRef<{ target: THREE.Vector3 } | null>(null);
+  const controlsRef = useRef<OrbitControlsImpl | null>(null);
   const cameraRef = useRef<THREE.Camera | null>(null);
 
   useFrame(({ camera }) => {
@@ -58,7 +59,7 @@ function CamRig({ view }: { view: CameraView }) {
 
   return (
     <OrbitControls
-      ref={controlsRef as React.Ref<typeof OrbitControls>}
+      ref={controlsRef}
       target={CAM_VIEWS[view].target}
       minDistance={2}
       maxDistance={12}

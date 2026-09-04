@@ -3,6 +3,7 @@ import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
 import { useLocation } from "wouter";
 import * as THREE from "three";
+import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
 import { useStore } from "../store/useStore";
 import { useRoomEvents } from "../hooks/useRoomEvents";
 import type { CameraView } from "../hooks/useRoomEvents";
@@ -26,7 +27,7 @@ interface CamRigProps {
 
 function CamRig({ view, onReached }: CamRigProps) {
   const { camera } = useThree();
-  const controlsRef = useRef<{ target: THREE.Vector3 } | null>(null);
+  const controlsRef = useRef<OrbitControlsImpl | null>(null);
   const reached = useRef(false);
 
   useEffect(() => {
@@ -51,7 +52,7 @@ function CamRig({ view, onReached }: CamRigProps) {
 
   return (
     <OrbitControls
-      ref={controlsRef as React.Ref<typeof OrbitControls>}
+      ref={controlsRef}
       target={CAM_PRESETS[view].target}
       minDistance={1.5}
       maxDistance={14}
