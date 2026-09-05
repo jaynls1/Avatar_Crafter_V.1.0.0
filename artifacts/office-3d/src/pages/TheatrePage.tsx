@@ -1,9 +1,10 @@
-import { Suspense, useRef } from "react";
+import { Suspense, useEffect, useRef } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { OrbitControls, Text } from "@react-three/drei";
 import { useLocation } from "wouter";
 import * as THREE from "three";
 import { OFFICES } from "../data/offices";
+import { trackEvent } from "../lib/analytics";
 
 const RW = 22;
 const RH = 9;
@@ -166,6 +167,9 @@ function StarField() {
 
 export default function TheatrePage() {
   const [, navigate] = useLocation();
+  useEffect(() => {
+    trackEvent("area_entered", { area: "theatre" });
+  }, []);
 
   return (
     <div style={{ width: "100vw", height: "100vh", background: "#04030a" }}>

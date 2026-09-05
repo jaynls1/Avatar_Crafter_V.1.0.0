@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Agent } from "../agents";
+import { trackEvent } from "../lib/analytics";
 
 interface Message {
   from: "user" | "agent";
@@ -108,10 +109,19 @@ export function InteractionPanel({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ title: `Chat with ${agentName}`, agentId }),
       });
-      if (!r.ok) return null;
+      if (!r.ok) {
+        trackEvent("conversation_create_failed", { error_kind: "http" });
+        return null;
+      }
       const conv = await r.json();
-      return typeof conv?.id === "number" ? conv.id : null;
+      if (typeof conv?.id !== "number") {
+        trackEvent("conversation_create_failed", { error_kind: "invalid_response" });
+        return null;
+      }
+      trackEvent("conversation_created");
+      return conv.id;
     } catch {
+      trackEvent("conversation_create_failed", { error_kind: "network" });
       return null;
     }
   };
@@ -122,6 +132,7 @@ export function InteractionPanel({
     const greeting: Message = { from: "agent", text: agent.greeting, timestamp: Date.now() };
     setMessages([greeting]);
     setConversationId(null);
+    trackEvent("conversation_reset", { message_count: 1 });
     const newId = await createNewConversation(agent.name, agent.id);
     setConversationId(newId);
     saveHistory(agent.id, [greeting], newId);
@@ -181,6 +192,7 @@ export function InteractionPanel({
     if (!input.trim() || !agent || !conversationId || isStreaming) return;
 
     const text = input.trim();
+    const messageCount = messages.filter((message) => !message.streaming).length + 2;
     setInput("");
 
     const userMsg: Message = { from: "user", text, timestamp: Date.now() };
@@ -206,7 +218,14 @@ export function InteractionPanel({
         signal: ctrl.signal,
       });
 
-      if (!response.body) throw new Error("No response body");
+      if (!response.ok) {
+        trackEvent("conversation_send_failed", { error_kind: "http" });
+        throw new Error("Message request failed");
+      }
+      if (!response.body) {
+        trackEvent("conversation_send_failed", { error_kind: "no_response_body" });
+        throw new Error("No response body");
+      }
 
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
@@ -249,7 +268,14 @@ export function InteractionPanel({
           } catch {}
         }
       }
+      trackEvent("conversation_sent", {
+        message_length: text.length,
+        message_count: messageCount,
+      });
     } catch (err: any) {
+      if (err.name !== "AbortError" && err.message !== "Message request failed" && err.message !== "No response body") {
+        trackEvent("conversation_send_failed", { error_kind: "network" });
+      }
       setMessages((prev) => {
         const next = [...prev];
         const last = next[next.length - 1];
@@ -286,8 +312,12 @@ export function InteractionPanel({
     if (!text) return;
     navigator.clipboard.writeText(text).then(() => {
       setConvCopied(true);
+      trackEvent("conversation_copied", {
+        message_count: messages.filter((message) => !message.streaming && message.text.trim() !== "").length,
+      });
       setTimeout(() => setConvCopied(false), 1500);
     }).catch(() => {
+      trackEvent("clipboard_failed", { error_kind: "permission_or_unavailable" });
       alert("Could not copy to clipboard. Please check browser permissions.");
     });
   };
@@ -295,6 +325,7 @@ export function InteractionPanel({
   const copyMessage = (index: number, text: string) => {
     navigator.clipboard.writeText(text).then(() => {
       setCopiedMsgIndex(index);
+      trackEvent("message_copied", { message_length: text.length });
       setTimeout(() => setCopiedMsgIndex((prev) => (prev === index ? null : prev)), 1500);
     }).catch(() => {});
   };
@@ -303,6 +334,7 @@ export function InteractionPanel({
     if (!agent?.description) return;
     navigator.clipboard.writeText(agent.description).then(() => {
       setBioCopied(true);
+      trackEvent("bio_copied");
       setTimeout(() => setBioCopied(false), 1500);
     }).catch(() => {});
   };
@@ -311,6 +343,7 @@ export function InteractionPanel({
     const SpeechRecognition =
       (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SpeechRecognition) {
+      trackEvent("voice_input_failed", { error_kind: "unsupported" });
       alert("Voice input not supported in this browser. Try Chrome.");
       return;
     }
@@ -325,7 +358,10 @@ export function InteractionPanel({
       setInput(transcript);
       setListening(false);
     };
-    recognition.onerror = () => setListening(false);
+    recognition.onerror = () => {
+      setListening(false);
+      trackEvent("voice_input_failed", { error_kind: "recognition" });
+    };
     recognition.onend = () => setListening(false);
   };
 

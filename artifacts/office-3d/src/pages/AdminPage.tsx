@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { listRooms, createRoom, updateRoom, deleteRoom, type RoomConfig } from "../lib/api";
 import { SOFTWARE_TOOLS, AGENT_PRESETS, FURNITURE_PRESETS } from "../data/tools";
+import { trackEvent } from "../lib/analytics";
 
 const base = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -23,6 +24,7 @@ export default function AdminPage() {
       const list = await listRooms();
       setRooms(list);
     } catch (e) {
+      trackEvent("back_office_load_failed", { error_kind: "request_failed" });
       setError(String(e));
     } finally {
       setLoading(false);
@@ -30,6 +32,9 @@ export default function AdminPage() {
   }
 
   useEffect(() => { load(); }, []);
+  useEffect(() => {
+    trackEvent("back_office_entered", { source: "office_3d" });
+  }, []);
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
@@ -49,8 +54,10 @@ export default function AdminPage() {
       });
       setNewSlug("");
       setNewName("");
+      trackEvent("room_created", { room_slug: newSlug.trim() });
       await load();
     } catch (e) {
+      trackEvent("room_create_failed", { error_kind: "request_failed" });
       setCreateError(String(e));
     } finally {
       setCreating(false);
@@ -61,8 +68,10 @@ export default function AdminPage() {
     if (!confirm(`Delete room "${slug}"? This cannot be undone.`)) return;
     try {
       await deleteRoom(slug);
+      trackEvent("room_deleted", { room_slug: slug });
       await load();
     } catch (e) {
+      trackEvent("room_delete_failed", { error_kind: "request_failed" });
       alert(String(e));
     }
   }
@@ -74,8 +83,14 @@ export default function AdminPage() {
       : [...room.tools, SOFTWARE_TOOLS.find(t => t.id === toolId)!];
     try {
       await updateRoom(room.slug, { tools: newTools });
+      trackEvent("room_configuration_updated", {
+        room_slug: room.slug,
+        configuration: "tools",
+        enabled: !has,
+      });
       await load();
     } catch (e) {
+      trackEvent("room_configuration_failed", { error_kind: "request_failed" });
       alert(String(e));
     }
   }

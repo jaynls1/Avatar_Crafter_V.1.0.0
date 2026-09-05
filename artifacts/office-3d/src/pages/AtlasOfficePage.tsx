@@ -11,6 +11,7 @@ import Room, { ROOM_DIMS } from "../components/Room";
 import Furniture from "../components/Furniture";
 import PhotoAgent from "../components/PhotoAgent";
 import WallPoster from "../components/WallPoster";
+import { trackEvent } from "../lib/analytics";
 import atlasAvatarUrl from "../../../../attached_assets/Atlas_(3)_1788416552815.png";
 
 const { w, h, d } = ROOM_DIMS;
@@ -109,6 +110,10 @@ export default function AtlasOfficePage() {
     const slug = params.get("room") ?? "atlas";
     loadRoomFromApi(slug);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    trackEvent("agent_office_entered", { agent_slug: "atlas" });
+  }, []);
 
   const posters = buildAtlasPosters(tools);
 

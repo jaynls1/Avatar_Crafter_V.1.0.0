@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { trackEvent } from "../lib/analytics";
 
 const O = "#F97316";
 const OR = (a: number) => `rgba(249,115,22,${a})`;
@@ -135,7 +136,13 @@ export default function BackOffice({ onBack }: { onBack: () => void }) {
           } catch {}
         }
       }
+      if (res.ok) {
+        trackEvent("admin_chat_completed");
+      } else {
+        trackEvent("admin_chat_failed", { reason: "server_response" });
+      }
     } catch {
+      trackEvent("admin_chat_failed", { reason: "network_error" });
       setMessages(prev => {
         const updated = [...prev];
         updated[updated.length - 1] = { role: "assistant", content: "⚠ Connection error" };
@@ -205,9 +212,16 @@ export default function BackOffice({ onBack }: { onBack: () => void }) {
         body: JSON.stringify({ instruction: broadcastText }),
       });
       const data = await res.json();
-      setBroadcastResult(`✓ Broadcast delivered to ${data.agentsReached}/${data.total} agents`);
-      setBroadcastText("");
+      if (res.ok) {
+        trackEvent("admin_broadcast_delivered");
+        setBroadcastResult(`✓ Broadcast delivered to ${data.agentsReached}/${data.total} agents`);
+        setBroadcastText("");
+      } else {
+        trackEvent("admin_broadcast_failed", { reason: "server_response" });
+        setBroadcastResult("⚠ Broadcast failed");
+      }
     } catch {
+      trackEvent("admin_broadcast_failed", { reason: "network_error" });
       setBroadcastResult("⚠ Broadcast failed");
     } finally {
       setBroadcasting(false);
@@ -241,8 +255,11 @@ export default function BackOffice({ onBack }: { onBack: () => void }) {
       });
       if (res.ok) {
         setMemorySettings(prev => ({ ...prev, [agentId]: enabled }));
+        trackEvent("memory_setting_updated", { enabled });
       }
-    } catch {}
+    } catch {
+      trackEvent("memory_setting_failed", { reason: "network_error" });
+    }
     finally { setTogglingAgent(null); }
   }
 
@@ -256,12 +273,15 @@ export default function BackOffice({ onBack }: { onBack: () => void }) {
       });
       const data = await res.json();
       if (res.ok) {
+        trackEvent("memory_sync_completed");
         setSyncResult(`✓ ${agentId} synced to Notion`);
         await loadMemoryStatus();
       } else {
+        trackEvent("memory_sync_failed", { reason: "server_response" });
         setSyncResult(`⚠ ${data.error ?? "Sync failed"}`);
       }
     } catch {
+      trackEvent("memory_sync_failed", { reason: "network_error" });
       setSyncResult("⚠ Connection error");
     } finally {
       setSyncingAgent(null);
@@ -284,12 +304,15 @@ export default function BackOffice({ onBack }: { onBack: () => void }) {
       });
       const data = await res.json();
       if (res.ok) {
+        trackEvent("conversation_import_completed");
         setImportResult(`✓ Imported ${data.imported} conversations (${data.failed} failed)`);
         await loadMemoryStatus();
       } else {
+        trackEvent("conversation_import_failed", { reason: "server_response" });
         setImportResult(`⚠ ${data.error ?? "Import failed"}`);
       }
     } catch (e: any) {
+      trackEvent("conversation_import_failed", { reason: "request_or_parse" });
       setImportResult(`⚠ ${e?.message ?? "Parse error"}`);
     } finally {
       setImporting(false);

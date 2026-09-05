@@ -1,4 +1,4 @@
-import { Suspense, useRef, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { OrbitControls, Text } from "@react-three/drei";
 import { useLocation, useParams } from "wouter";
@@ -6,6 +6,7 @@ import * as THREE from "three";
 import { getHallwayOffices, type Office } from "../data/offices";
 import { getSafeExternalUrl } from "../data/hallway";
 import WebGLErrorBoundary, { canUseWebGL, WebGLUnavailable } from "../components/WebGLErrorBoundary";
+import { trackEvent } from "../lib/analytics";
 
 function OfficeDoor({ office, position, rotY }: { office: Office; position: [number, number, number]; rotY: number }) {
   const [, navigate] = useLocation();
@@ -28,6 +29,7 @@ function OfficeDoor({ office, position, rotY }: { office: Office; position: [num
       const safeUrl = getSafeExternalUrl(office.breakroomUrl);
       if (safeUrl) window.open(safeUrl, "_blank", "noopener,noreferrer");
     } else {
+      trackEvent("agent_office_opened", { agent_slug: office.id, source: "agent_lobby" });
       navigate(office.path);
     }
   };
@@ -177,6 +179,9 @@ export default function AgentLobbyPage() {
 
   const wallColor = isLeft ? "#121824" : "#181a24";
   const radius = 7.8;
+  useEffect(() => {
+    trackEvent("area_entered", { area: "agent_lobby", wing: isLeft ? "a" : "b" });
+  }, [isLeft]);
 
   // We want to arrange the doors in an arc, leaving space behind the camera for the entrance
   // Angles from -PI/2 to PI/2 (front semicircle)

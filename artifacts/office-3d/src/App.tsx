@@ -6,6 +6,7 @@ import * as THREE from "three";
 import WebGLErrorBoundary from "./components/WebGLErrorBoundary";
 import Nova3D from "./components/Nova3D";
 import novaImg from "./assets/nova_smiling.jpg";
+import { trackEvent } from "./lib/analytics";
 
 // ─── HQ Screen helpers ────────────────────────────────────────────────────────
 const HQ_MESSAGES = [
@@ -502,11 +503,13 @@ function NovaGreeting({
         throw new Error(conversation.error || "Nova is unavailable right now.");
       }
       setChatConvId(conversation.id);
+      trackEvent("nova_conversation_opened", { source: "hq_greeting" });
       setChatMessages([{
         from: "nova",
         text: "I'm here. Ask me anything about NEXT, or tell me what you're building.",
       }]);
     } catch (error) {
+      trackEvent("nova_conversation_failed", { error_kind: "request_failed" });
       setChatError(error instanceof Error ? error.message : "Nova is unavailable right now.");
     } finally {
       setChatLoading(false);
@@ -573,6 +576,7 @@ function NovaGreeting({
       }
     } catch (error) {
       if ((error as Error).name !== "AbortError") {
+        trackEvent("nova_message_failed", { error_kind: "request_failed" });
         setChatMessages((previous) => previous.map((message, index) =>
           index === previous.length - 1
             ? { ...message, text: "Something interrupted — try again.", streaming: false }
@@ -951,10 +955,14 @@ export default function App() {
   // HQ screen URL (configurable via /api/hq-screen)
   const [screenUrl, setScreenUrl] = useState<string | null>(null);
   useEffect(() => {
+    trackEvent("area_entered", { area: "hq" });
+  }, []);
+
+  useEffect(() => {
     fetch("/api/hq-screen")
       .then(r => r.ok ? r.json() : null)
       .then(d => { if (d?.screenUrl) setScreenUrl(d.screenUrl); })
-      .catch(() => {});
+      .catch(() => trackEvent("hq_screen_load_failed", { error_kind: "request_failed" }));
   }, []);
 
   // Greeting state
@@ -969,6 +977,7 @@ export default function App() {
   }, []);
 
   function handleChoose(wing: WingChoice) {
+    if (wing) trackEvent("wing_selected", { wing, source: "nova_greeting" });
     setGreetingPhase("dismissing");
     setSelectedWing(wing);
     setTooltipDismissed(false);
@@ -997,7 +1006,10 @@ export default function App() {
             <DarkCeiling />
             <LobbyWalls />
             <LobbyColumns />
-            <MagicScreen onClick={() => navigate("/theatre")} screenUrl={screenUrl} />
+            <MagicScreen onClick={() => {
+              trackEvent("area_navigation", { area: "theatre", source: "hq_screen" });
+              navigate("/theatre");
+            }} screenUrl={screenUrl} />
             {/* Nova's model loads separately so the lobby remains usable while assets load */}
             <Suspense fallback={null}>
               <Nova3D position={[2.6, 0, -3.2]} rotationY={-0.5} />
@@ -1006,14 +1018,20 @@ export default function App() {
               side="left"
               label="WING A"
               subLabel="6 Offices"
-              onClick={() => navigate("/hallway/left")}
+              onClick={() => {
+                trackEvent("area_navigation", { area: "hallway", wing: "a", source: "hq_arch" });
+                navigate("/hallway/left");
+              }}
               highlighted={showTooltip && selectedWing === "A"}
             />
             <HallwayArch
               side="right"
               label="WING B"
               subLabel="5 Offices"
-              onClick={() => navigate("/hallway/right")}
+              onClick={() => {
+                trackEvent("area_navigation", { area: "hallway", wing: "b", source: "hq_arch" });
+                navigate("/hallway/right");
+              }}
               highlighted={showTooltip && selectedWing === "B"}
             />
             <OrbitControls
@@ -1034,13 +1052,22 @@ export default function App() {
       <div style={{ position: "fixed", top: 0, left: 0, right: 0, zIndex: 20, pointerEvents: "none" }}>
         <div style={{ padding: "14px 22px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div style={{ display: "flex", gap: 8, pointerEvents: "auto" }}>
-            <button onClick={() => navigate("/hallway/left")} style={{ padding: "7px 14px", borderRadius: 7, border: "1px solid rgba(200,160,80,0.3)", background: "rgba(200,160,80,0.1)", color: "#c8a050", cursor: "pointer", fontSize: 12 }}>Wing A</button>
-            <button onClick={() => navigate("/hallway/right")} style={{ padding: "7px 14px", borderRadius: 7, border: "1px solid rgba(200,160,80,0.3)", background: "rgba(200,160,80,0.1)", color: "#c8a050", cursor: "pointer", fontSize: 12 }}>Wing B</button>
+            <button onClick={() => {
+              trackEvent("area_navigation", { area: "hallway", wing: "a", source: "hq_navigation" });
+              navigate("/hallway/left");
+            }} style={{ padding: "7px 14px", borderRadius: 7, border: "1px solid rgba(200,160,80,0.3)", background: "rgba(200,160,80,0.1)", color: "#c8a050", cursor: "pointer", fontSize: 12 }}>Wing A</button>
+            <button onClick={() => {
+              trackEvent("area_navigation", { area: "hallway", wing: "b", source: "hq_navigation" });
+              navigate("/hallway/right");
+            }} style={{ padding: "7px 14px", borderRadius: 7, border: "1px solid rgba(200,160,80,0.3)", background: "rgba(200,160,80,0.1)", color: "#c8a050", cursor: "pointer", fontSize: 12 }}>Wing B</button>
           </div>
           <div style={{ color: "#c8a050", fontSize: 13, letterSpacing: "2px", fontWeight: 600 }}>NEXT LEVEL HQ</div>
           <div style={{ display: "flex", gap: 8, pointerEvents: "auto" }}>
-            <button onClick={() => navigate("/theatre")} style={{ padding: "7px 14px", borderRadius: 7, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.06)", color: "#e8e4d8", cursor: "pointer", fontSize: 12 }}>🎭 Theatre</button>
-            <a href={`${import.meta.env.BASE_URL}admin`} style={{ padding: "7px 14px", borderRadius: 7, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.06)", color: "#e8e4d8", fontSize: 12, textDecoration: "none" }}>⚙ Admin</a>
+            <button onClick={() => {
+              trackEvent("area_navigation", { area: "theatre", source: "hq_navigation" });
+              navigate("/theatre");
+            }} style={{ padding: "7px 14px", borderRadius: 7, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.06)", color: "#e8e4d8", cursor: "pointer", fontSize: 12 }}>🎭 Theatre</button>
+            <a onClick={() => trackEvent("back_office_opened", { source: "hq_navigation" })} href={`${import.meta.env.BASE_URL}admin`} style={{ padding: "7px 14px", borderRadius: 7, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.06)", color: "#e8e4d8", fontSize: 12, textDecoration: "none" }}>⚙ Admin</a>
           </div>
         </div>
       </div>

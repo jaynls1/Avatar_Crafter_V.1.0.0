@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { useParams, useLocation } from "wouter";
 import NovaOffice from "./offices/NovaOffice";
 import SniperOffice from "./offices/SniperOffice";
@@ -8,6 +9,7 @@ import RookOffice from "./offices/RookOffice";
 import IggyOffice from "./offices/IggyOffice";
 import AnchorOffice from "./offices/AnchorOffice";
 import HavenOffice from "./offices/HavenOffice";
+import { trackEvent } from "../lib/analytics";
 
 const OFFICES: Record<string, React.ComponentType> = {
   nova:   NovaOffice,
@@ -25,6 +27,9 @@ export default function OfficePage() {
   const { id } = useParams<{ id: string }>();
   const [, navigate] = useLocation();
   const OfficeComponent = OFFICES[id || ""];
+  useEffect(() => {
+    if (id && OFFICES[id]) trackEvent("agent_office_entered", { agent_slug: id });
+  }, [id]);
 
   if (!OfficeComponent) {
     return (

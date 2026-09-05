@@ -4,6 +4,7 @@ import { Text } from "@react-three/drei";
 import * as THREE from "three";
 import type { SoftwareTool } from "../data/tools";
 import { useStore } from "../store/useStore";
+import { trackEvent } from "../lib/analytics";
 
 interface WallPosterProps {
   tool: SoftwareTool;
@@ -24,6 +25,7 @@ export default function WallPoster({ tool, position, rotation = [0, 0, 0] }: Wal
   });
 
   const handleClick = () => {
+    trackEvent("tool_opened", { tool_slug: tool.id, category: tool.category.toLowerCase() });
     speak(`Opening ${tool.name}. ${tool.description}.`);
     setTimeout(() => window.open(tool.url, "_blank"), 800);
   };

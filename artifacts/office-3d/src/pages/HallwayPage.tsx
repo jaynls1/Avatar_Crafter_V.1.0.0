@@ -1,10 +1,11 @@
-import { Suspense, useRef, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { Image as DreiImage, OrbitControls, Text } from "@react-three/drei";
 import { useLocation, useParams } from "wouter";
 import * as THREE from "three";
 import { getSafeExternalUrl, MEMBER_SUCCESS_STORIES, type MemberSuccess } from "../data/hallway";
 import WebGLErrorBoundary, { canUseWebGL, WebGLUnavailable } from "../components/WebGLErrorBoundary";
+import { trackEvent } from "../lib/analytics";
 
 const HW = 12.5;
 const HH = 4.5;
@@ -183,6 +184,9 @@ export default function HallwayPage() {
 
   const stories = MEMBER_SUCCESS_STORIES.filter(s => s.wing === (isLeft ? "left" : "right"));
   const wallColor = isLeft ? "#12151c" : "#1a161b";
+  useEffect(() => {
+    trackEvent("area_entered", { area: "hallway", wing: isLeft ? "a" : "b" });
+  }, [isLeft]);
 
   return (
     <div style={{ width: "100vw", height: "100vh", background: "#050608" }}>

@@ -5,6 +5,7 @@ import { useLocation } from "wouter";
 import * as THREE from "three";
 import { getSafeExternalUrl, GRATITUDE_ENTRIES, type GratitudeEntry } from "../data/hallway";
 import WebGLErrorBoundary, { canUseWebGL, WebGLUnavailable } from "../components/WebGLErrorBoundary";
+import { trackEvent } from "../lib/analytics";
 
 function GratitudePlaque({ entry, position, rotY }: { entry: GratitudeEntry; position: [number, number, number]; rotY: number }) {
   const [hovered, setHovered] = useState(false);
@@ -148,6 +149,9 @@ function NextFloorMat() {
 export default function GratitudePage() {
   const [, navigate] = useLocation();
   const webglSupported = canUseWebGL();
+  useEffect(() => {
+    trackEvent("area_entered", { area: "gratitude" });
+  }, []);
 
   // Mount recognition plaques around the room's inner wall.
   const radius = 10.55;

@@ -12,6 +12,7 @@ import novaBackProfile from "./assets/Nova_Back_Side_Profile_Full_1776316654576.
 import AboutPage from "./pages/AboutPage";
 import RookCommandCenter from "./components/RookCommandCenter";
 import BackOffice from "./pages/BackOffice";
+import { trackEvent } from "./lib/analytics";
 
 import nextNLogoImg from "./assets/next_n_logo.png";
 import teamPhotoImg from "./assets/team_photo.png";
@@ -116,7 +117,7 @@ function getNovaReply(input: string): string {
   return "We're still building NEXT, but I'm here for questions. What would you like to know?";
 }
 
-function PortalDoor({ onEnter, onBackOffice }: { onEnter: () => void; onBackOffice: () => void }) {
+function PortalDoor({ onEnter, onBackOffice }: { onEnter: (entryPoint: "door_surface" | "entry_cta") => void; onBackOffice: () => void }) {
   // Door geometry constants — corridor walls converge on these
   const DW = 220, DH = 364;
 
@@ -324,7 +325,7 @@ function PortalDoor({ onEnter, onBackOffice }: { onEnter: () => void; onBackOffi
       }}>
         {/* Clickable door surface */}
         <div
-          onClick={onEnter}
+          onClick={() => onEnter("door_surface")}
           className="portal-door"
           style={{
             width: "100%", height: "100%",
@@ -520,7 +521,7 @@ function PortalDoor({ onEnter, onBackOffice }: { onEnter: () => void; onBackOffi
         {/* CTA — flat below the headline */}
         <div style={{ paddingLeft: "4%", marginTop: 34 }}>
           <button
-            onClick={onEnter}
+            onClick={() => onEnter("entry_cta")}
             className="enter-btn"
             style={{
               padding: "13px 30px",
@@ -999,6 +1000,9 @@ function NovaGreeting({ onEnterLobby }: { onEnterLobby: () => void }) {
         body: JSON.stringify({ content: text }),
         signal: ctrl.signal,
       });
+      if (!resp.ok) {
+        trackEvent("nova_chat_failed", { reason: "server_response" });
+      }
 
       const reader = resp.body!.getReader();
       const dec = new TextDecoder();
@@ -1031,7 +1035,11 @@ function NovaGreeting({ onEnterLobby }: { onEnterLobby: () => void }) {
           } catch { /* ignore parse errors */ }
         }
       }
+      if (resp.ok) {
+        trackEvent("nova_chat_completed");
+      }
     } catch {
+      trackEvent("nova_chat_failed", { reason: "network_error" });
       setIsTalking(false);
       setMessages((p) => p.map((m, i) => i === p.length - 1
         ? { ...m, text: "Something interrupted — try again.", streaming: false }
@@ -1326,11 +1334,12 @@ function NovaGreeting({ onEnterLobby }: { onEnterLobby: () => void }) {
   );
 }
 
-function NovaLobby({ onEnterWorld, onAbout, onRook, onBackOffice, visitedAbout }: { onEnterWorld: () => void; onAbout: () => void; onRook: () => void; onBackOffice: () => void; visitedAbout: boolean }) {
+function NovaLobby({ onEnterWorld, onAbout, onRook, onBackOffice, visitedAbout }: { onEnterWorld: () => void; onAbout: () => void; onRook: () => void; onBackOffice: (source: "lobby_header" | "lobby_footer") => void; visitedAbout: boolean }) {
   const [opening, setOpening] = useState(false);
 
   const handleOpen = () => {
     if (opening) return;
+    trackEvent("agent_world_entry", { source: "lobby_door" });
     setOpening(true);
     setTimeout(onEnterWorld, 1000);
   };
@@ -1369,7 +1378,7 @@ function NovaLobby({ onEnterWorld, onAbout, onRook, onBackOffice, visitedAbout }
           </div>
           {/* ⬡ HQ — Mission Control entry */}
           <button
-            onClick={onBackOffice}
+            onClick={() => onBackOffice("lobby_header")}
             title="Mission Control"
             style={{
               background: `linear-gradient(135deg, ${OR(0.18)}, ${OR(0.08)})`,
@@ -1616,7 +1625,7 @@ function NovaLobby({ onEnterWorld, onAbout, onRook, onBackOffice, visitedAbout }
 
       {/* ── HQ — admin-only, bottom-right ── */}
       <button
-        onClick={onBackOffice}
+        onClick={() => onBackOffice("lobby_footer")}
         title="Mission Control"
         style={{
           position: "absolute", bottom: 22, right: 26,
@@ -1687,12 +1696,20 @@ function IntakeForm({ onEnter, onBack }: { onEnter: () => void; onBack: () => vo
     setError("");
     setLoading(true);
     try {
-      await fetch("/api/visitors", {
+      const response = await fetch("/api/visitors", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: name.trim(), goal }),
       });
-    } catch { /* never block entry on API failure */ }
+      if (response.ok) {
+        trackEvent("visitor_intake_submitted", { goal });
+      } else {
+        trackEvent("visitor_intake_failed", { reason: "server_response" });
+      }
+    } catch {
+      trackEvent("visitor_intake_failed", { reason: "network_error" });
+      /* never block entry on API failure */
+    }
     onEnter();
   }
 
@@ -1832,23 +1849,28 @@ export default function App() {
     setTimeout(() => { window.location.href = "/"; }, 650);
   };
 
+  const openBackOffice = (source: "portal_header" | "lobby_header" | "lobby_footer") => {
+    trackEvent("back_office_entry", { source });
+    setScreen("backoffice");
+  };
+
   return (
     <div style={{ width: "100vw", height: "100vh", overflow: "hidden", background: "#000" }}>
-      {screen === "door"    && <PortalDoor onEnter={() => setScreen("opening")} onBackOffice={() => setScreen("backoffice")} />}
+      {screen === "door"    && <PortalDoor onEnter={(entryPoint) => { trackEvent("portal_entry_click", { entry_point: entryPoint }); setScreen("opening"); }} onBackOffice={() => openBackOffice("portal_header")} />}
       {screen === "opening" && <OpeningAnimation onComplete={() => setScreen("nova")} />}
       {screen === "nova"    && <NovaGreeting onEnterLobby={() => setScreen("lobby")} />}
       {screen === "lobby"   && (
         <NovaLobby
           onEnterWorld={() => setScreen("intake")}
-          onAbout={() => setScreen("about")}
-          onRook={() => setScreen("rook")}
-          onBackOffice={() => setScreen("backoffice")}
+          onAbout={() => { trackEvent("about_open", { source: "lobby_frame" }); setScreen("about"); }}
+          onRook={() => { trackEvent("security_channel_enter", { source: "lobby_secure_access" }); setScreen("rook"); }}
+          onBackOffice={openBackOffice}
           visitedAbout={visitedAbout}
         />
       )}
       {screen === "intake"     && <IntakeForm onEnter={enterWorld} onBack={() => setScreen("lobby")} />}
-      {screen === "about"      && <AboutPage onBack={() => { setVisitedAbout(true); setScreen("lobby"); }} />}
-      {screen === "rook"       && <RookCommandCenter onBack={() => setScreen("lobby")} />}
+      {screen === "about"      && <AboutPage onBack={() => { trackEvent("about_back", { destination: "lobby" }); setVisitedAbout(true); setScreen("lobby"); }} />}
+      {screen === "rook"       && <RookCommandCenter onBack={() => { trackEvent("security_channel_exit", { destination: "lobby" }); setScreen("lobby"); }} />}
       {screen === "backoffice" && <BackOffice onBack={() => setScreen("lobby")} />}
 
       {/* Full-screen black veil — fades in before any hard navigation to prevent white flash */}

@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useMemo } from "react";
+import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { Agent, fetchAgents, getLobbyAgents, getLobbyAgentIds } from "./agents";
 import { Scene3D } from "./components/Scene3D";
 import { InteractionPanel } from "./components/InteractionPanel";
@@ -10,6 +10,7 @@ import {
   NEXT_LEVEL_PORTAL_URL,
   VIRTUAL_OFFICE_URL,
 } from "./lib/trustedNavigation";
+import { trackEvent } from "./lib/analytics";
 
 function detectWebGL(): boolean {
   try {
@@ -103,6 +104,7 @@ function JourneyNavigation() {
         <a
           className="next-journey-nav__link next-journey-nav__link--primary"
           href={VIRTUAL_OFFICE_URL}
+          onClick={() => trackEvent("journey_navigation_clicked", { destination: "virtual_office" })}
         >
           Continue to Virtual Offices
           <span aria-hidden="true">→</span>
@@ -110,6 +112,7 @@ function JourneyNavigation() {
         <a
           className="next-journey-nav__link next-journey-nav__link--secondary"
           href={NEXT_LEVEL_PORTAL_URL}
+          onClick={() => trackEvent("journey_navigation_clicked", { destination: "portal" })}
         >
           Return to NEXT Level
         </a>
@@ -126,6 +129,15 @@ function HUD({
   lobbyCount: number;
 }) {
   const { user, isAuthenticated, isLoading, login, logout } = useAuth();
+  const previousAuthState = useRef<boolean | null>(null);
+
+  useEffect(() => {
+    if (isLoading) return;
+    if (previousAuthState.current === false && isAuthenticated) {
+      trackEvent("member_entry_succeeded");
+    }
+    previousAuthState.current = isAuthenticated;
+  }, [isAuthenticated, isLoading]);
 
   return (
     <div
@@ -185,7 +197,10 @@ function HUD({
               {user?.firstName ?? user?.email ?? "User"}
             </span>
             <button
-              onClick={logout}
+              onClick={() => {
+                trackEvent("sign_out_clicked");
+                logout();
+              }}
               style={{
                 background: "rgba(255,255,255,0.08)",
                 border: "1px solid rgba(255,255,255,0.15)",
@@ -201,7 +216,10 @@ function HUD({
           </div>
         ) : (
           <button
-            onClick={login}
+            onClick={() => {
+              trackEvent("sign_in_clicked");
+              login();
+            }}
             style={{
               background: "rgba(167,139,250,0.15)",
               border: "1px solid rgba(167,139,250,0.4)",
@@ -245,7 +263,11 @@ export default function App() {
   const [currentHour, setCurrentHour] = useState(new Date().getHours());
 
   useEffect(() => {
-    setWebGLAvailable(detectWebGL());
+    const hasWebGL = detectWebGL();
+    setWebGLAvailable(hasWebGL);
+    if (!hasWebGL) {
+      trackEvent("webgl_unavailable", { error_kind: "unsupported" });
+    }
     if (!EMBED_MODE) {
       const seen = localStorage.getItem("agentworld-tour-done");
       if (seen) setShowWalkthrough(false);
@@ -254,6 +276,7 @@ export default function App() {
       .then((data) => { setAgents(data); setAgentsLoading(false); })
       .catch((err)  => {
         console.error("Failed to load agents:", err);
+        trackEvent("agent_load_failed", { error_kind: "request_failed" });
         setAgentsError("Could not load agents. Please refresh.");
         setAgentsLoading(false);
       });
@@ -287,15 +310,23 @@ export default function App() {
     localStorage.setItem("agentworld-tour-done", "1");
   }, []);
 
-  const handleSelectAgent  = useCallback((agent: Agent) => setSelectedAgent(agent), []);
+  const handleSelectAgent = useCallback((agent: Agent) => {
+    if (selectedAgent?.id !== agent.id) {
+      trackEvent("agent_profile_opened");
+    }
+    setSelectedAgent(agent);
+  }, [selectedAgent]);
   const handleStartSpeaking = useCallback(() => {
     if (selectedAgent) setSpeakingAgentId(selectedAgent.id);
   }, [selectedAgent]);
   const handleStopSpeaking  = useCallback(() => setSpeakingAgentId(null), []);
   const handleClose = useCallback(() => {
+    if (selectedAgent) {
+      trackEvent("agent_profile_closed");
+    }
     setSelectedAgent(null);
     setSpeakingAgentId(null);
-  }, []);
+  }, [selectedAgent]);
 
   // ── Loading / error screens ──────────────────────────────────────────────────
   if (webGLAvailable === null || agentsLoading) {

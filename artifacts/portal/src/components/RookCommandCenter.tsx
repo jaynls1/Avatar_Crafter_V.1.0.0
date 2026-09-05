@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { trackEvent } from "../lib/analytics";
 
 const rookImg = `${import.meta.env.BASE_URL}about/agents/rook.png`;
 
@@ -48,39 +49,50 @@ export default function RookCommandCenter({ onBack }: { onBack: () => void }) {
     setBusy(true);
     setMessages(prev => [...prev, { from: "rook", text: "", streaming: true }]);
 
-    const res = await fetch(`/api/openai/conversations/${convId}/messages`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ content: text }),
-    });
-    const reader  = res.body!.getReader();
-    const decoder = new TextDecoder();
-    let full = "";
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      const lines = decoder.decode(value).split("\n").filter(l => l.startsWith("data: "));
-      for (const line of lines) {
-        try {
-          const d = JSON.parse(line.slice(6));
-          if (d.done)    { setBusy(false); }
-          if (d.content) {
-            full += d.content;
-            setMessages(prev => {
-              const next = [...prev];
-              next[next.length - 1] = { from: "rook", text: full, streaming: true };
-              return next;
-            });
-          }
-        } catch { /* skip */ }
+    try {
+      const res = await fetch(`/api/openai/conversations/${convId}/messages`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content: text }),
+      });
+      if (!res.ok) {
+        trackEvent("security_chat_failed", { reason: "server_response" });
       }
+      const reader  = res.body!.getReader();
+      const decoder = new TextDecoder();
+      let full = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        const lines = decoder.decode(value).split("\n").filter(l => l.startsWith("data: "));
+        for (const line of lines) {
+          try {
+            const d = JSON.parse(line.slice(6));
+            if (d.done)    { setBusy(false); }
+            if (d.content) {
+              full += d.content;
+              setMessages(prev => {
+                const next = [...prev];
+                next[next.length - 1] = { from: "rook", text: full, streaming: true };
+                return next;
+              });
+            }
+          } catch { /* skip */ }
+        }
+      }
+      if (res.ok) {
+        trackEvent("security_chat_completed");
+      }
+      setMessages(prev => {
+        const next = [...prev];
+        next[next.length - 1] = { from: "rook", text: full, streaming: false };
+        return next;
+      });
+    } catch (error) {
+      trackEvent("security_chat_failed", { reason: "network_error" });
+      throw error;
     }
-    setMessages(prev => {
-      const next = [...prev];
-      next[next.length - 1] = { from: "rook", text: full, streaming: false };
-      return next;
-    });
     setBusy(false);
   };
 
@@ -94,6 +106,7 @@ export default function RookCommandCenter({ onBack }: { onBack: () => void }) {
         body: JSON.stringify({ subject: emailSubject, message: emailBody }),
       });
       if (res.ok) {
+        trackEvent("security_email_sent");
         setEmailStatus("sent");
         setTimeout(() => {
           setEmailStatus("idle");
@@ -102,10 +115,12 @@ export default function RookCommandCenter({ onBack }: { onBack: () => void }) {
           setEmailBody("");
         }, 3000);
       } else {
+        trackEvent("security_email_failed", { reason: "server_response" });
         setEmailStatus("error");
         setTimeout(() => setEmailStatus("idle"), 5000);
       }
     } catch {
+      trackEvent("security_email_failed", { reason: "network_error" });
       setEmailStatus("error");
       setTimeout(() => setEmailStatus("idle"), 5000);
     }
