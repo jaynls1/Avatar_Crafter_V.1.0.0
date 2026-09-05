@@ -29,7 +29,7 @@ function OfficeDoor({ office, position, rotY }: { office: Office; position: [num
       const safeUrl = getSafeExternalUrl(office.breakroomUrl);
       if (safeUrl) window.open(safeUrl, "_blank", "noopener,noreferrer");
     } else {
-      trackEvent("agent_office_opened", { agent_slug: office.id, source: "agent_lobby" });
+      trackEvent("agent_office_opened", { source: "agent_lobby" });
       navigate(office.path);
     }
   };

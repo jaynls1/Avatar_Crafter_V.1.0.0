@@ -54,7 +54,7 @@ export default function AdminPage() {
       });
       setNewSlug("");
       setNewName("");
-      trackEvent("room_created", { room_slug: newSlug.trim() });
+      trackEvent("room_created");
       await load();
     } catch (e) {
       trackEvent("room_create_failed", { error_kind: "request_failed" });
@@ -68,7 +68,7 @@ export default function AdminPage() {
     if (!confirm(`Delete room "${slug}"? This cannot be undone.`)) return;
     try {
       await deleteRoom(slug);
-      trackEvent("room_deleted", { room_slug: slug });
+      trackEvent("room_deleted");
       await load();
     } catch (e) {
       trackEvent("room_delete_failed", { error_kind: "request_failed" });
@@ -84,7 +84,6 @@ export default function AdminPage() {
     try {
       await updateRoom(room.slug, { tools: newTools });
       trackEvent("room_configuration_updated", {
-        room_slug: room.slug,
         configuration: "tools",
         enabled: !has,
       });

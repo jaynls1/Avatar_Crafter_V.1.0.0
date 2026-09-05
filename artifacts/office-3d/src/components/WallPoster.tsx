@@ -25,7 +25,7 @@ export default function WallPoster({ tool, position, rotation = [0, 0, 0] }: Wal
   });
 
   const handleClick = () => {
-    trackEvent("tool_opened", { tool_slug: tool.id, category: tool.category.toLowerCase() });
+    trackEvent("tool_open_clicked", { category: tool.category.toLowerCase() });
     speak(`Opening ${tool.name}. ${tool.description}.`);
     setTimeout(() => window.open(tool.url, "_blank"), 800);
   };

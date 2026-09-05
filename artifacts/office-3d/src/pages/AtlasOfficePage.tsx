@@ -112,7 +112,7 @@ export default function AtlasOfficePage() {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    trackEvent("agent_office_entered", { agent_slug: "atlas" });
+    trackEvent("agent_office_entered", { source: "dedicated_route" });
   }, []);
 
   const posters = buildAtlasPosters(tools);

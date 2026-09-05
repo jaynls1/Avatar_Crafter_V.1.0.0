@@ -28,7 +28,7 @@ export default function OfficePage() {
   const [, navigate] = useLocation();
   const OfficeComponent = OFFICES[id || ""];
   useEffect(() => {
-    if (id && OFFICES[id]) trackEvent("agent_office_entered", { agent_slug: id });
+    if (id && OFFICES[id]) trackEvent("agent_office_entered", { source: "office_route" });
   }, [id]);
 
   if (!OfficeComponent) {

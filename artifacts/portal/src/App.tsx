@@ -992,6 +992,7 @@ function NovaGreeting({ onEnterLobby }: { onEnterLobby: () => void }) {
     abortRef.current?.abort();
     const ctrl = new AbortController();
     abortRef.current = ctrl;
+    let responseFailureTracked = false;
 
     try {
       const resp = await fetch(`/api/openai/conversations/${convId}/messages`, {
@@ -1002,6 +1003,7 @@ function NovaGreeting({ onEnterLobby }: { onEnterLobby: () => void }) {
       });
       if (!resp.ok) {
         trackEvent("nova_chat_failed", { reason: "server_response" });
+        responseFailureTracked = true;
       }
 
       const reader = resp.body!.getReader();
@@ -1038,8 +1040,11 @@ function NovaGreeting({ onEnterLobby }: { onEnterLobby: () => void }) {
       if (resp.ok) {
         trackEvent("nova_chat_completed");
       }
-    } catch {
-      trackEvent("nova_chat_failed", { reason: "network_error" });
+    } catch (error) {
+      const isAbortError = error instanceof DOMException && error.name === "AbortError";
+      if (!responseFailureTracked && !isAbortError) {
+        trackEvent("nova_chat_failed", { reason: "network_error" });
+      }
       setIsTalking(false);
       setMessages((p) => p.map((m, i) => i === p.length - 1
         ? { ...m, text: "Something interrupted — try again.", streaming: false }

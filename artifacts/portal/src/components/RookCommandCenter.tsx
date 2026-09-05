@@ -48,6 +48,7 @@ export default function RookCommandCenter({ onBack }: { onBack: () => void }) {
     setMessages(prev => [...prev, { from: "user", text }]);
     setBusy(true);
     setMessages(prev => [...prev, { from: "rook", text: "", streaming: true }]);
+    let responseFailureTracked = false;
 
     try {
       const res = await fetch(`/api/openai/conversations/${convId}/messages`, {
@@ -57,6 +58,7 @@ export default function RookCommandCenter({ onBack }: { onBack: () => void }) {
       });
       if (!res.ok) {
         trackEvent("security_chat_failed", { reason: "server_response" });
+        responseFailureTracked = true;
       }
       const reader  = res.body!.getReader();
       const decoder = new TextDecoder();
@@ -90,7 +92,9 @@ export default function RookCommandCenter({ onBack }: { onBack: () => void }) {
         return next;
       });
     } catch (error) {
-      trackEvent("security_chat_failed", { reason: "network_error" });
+      if (!responseFailureTracked) {
+        trackEvent("security_chat_failed", { reason: "network_error" });
+      }
       throw error;
     }
     setBusy(false);
