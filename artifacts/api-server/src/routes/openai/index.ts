@@ -51,7 +51,7 @@ openaiRouter.post("/openai/conversations", async (req, res) => {
       title,
       agentId,
       userId: memberId,
-      isAdmin: req.user?.isAdmin === true,
+      isAdmin: req.dbUser?.isAdmin === true,
     })
     .returning();
 

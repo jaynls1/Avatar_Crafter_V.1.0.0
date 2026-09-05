@@ -4,6 +4,7 @@ import { db, visitorsTable } from "@workspace/db";
 import { sql } from "drizzle-orm";
 import { authorizePublic, ROUTE_AUTHORIZATION_MATRIX } from "../middlewares/routeAuthorization";
 import { adminMiddleware } from "../middlewares/adminMiddleware";
+import { requireAuth } from "../middlewares/clerkAuth";
 
 const router: IRouter = Router();
 
@@ -43,6 +44,7 @@ router.options("/visitors", (_req, res) => { cors(res); res.sendStatus(204); });
 // GET /api/visitors → last 10 visitors
 router.get(
   "/visitors",
+  requireAuth,
   adminMiddleware,
   async (_req, res) => {
   cors(res);

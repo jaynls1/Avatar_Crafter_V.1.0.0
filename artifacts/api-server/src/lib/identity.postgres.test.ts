@@ -12,12 +12,13 @@ const databaseUrl = process.env.TEST_DATABASE_URL;
 const integrationTest = databaseUrl ? test : test.skip;
 
 type DbModule = typeof import("@workspace/db");
-type AuthModule = typeof import("./auth");
+type AuthModule = typeof import("./localSession");
 type RateLimitModule = typeof import("./integrationRateLimit");
 
 let database: DbModule;
 let auth: AuthModule;
 let rateLimit: RateLimitModule;
+let clerkAuth: typeof import("../middlewares/clerkAuth");
 let app: Express;
 let server: Server;
 let baseUrl: string;
@@ -212,6 +213,7 @@ before(async () => {
   process.env.NEXT_IDENTITY_AUDIENCE = "wrong-environment-override";
   process.env.NEXT_EVENTS_AUDIENCE = "wrong-environment-override";
   process.env.SESSION_SECRET = "disposable-ci-session-secret-material";
+  process.env.ISSUER_URL = issuer;
   process.env.APP_ALLOWED_ORIGINS = "https://approved.example.test";
   process.env.NEXT_IDENTITY_DESTINATIONS = JSON.stringify({
     avatar: { returnTo: "/done", authorizeUrl: "/source/authorize" },
@@ -222,14 +224,14 @@ before(async () => {
 
   database = await import("@workspace/db");
   await applyDisposableMigrations();
-  auth = await import("./auth");
+  auth = await import("./localSession");
   rateLimit = await import("./integrationRateLimit");
+  clerkAuth = await import("../middlewares/clerkAuth");
 
   const express = (await import("express")).default;
   const cors = (await import("cors")).default;
   const cookieParser = (await import("cookie-parser")).default;
   const { credentialedCorsOptions } = await import("./corsPolicy");
-  const { authMiddleware } = await import("../middlewares/authMiddleware");
   const integrationRouter = (await import("../routes/integrations")).default;
   const officeRouter = (await import("../routes/offices")).default;
   const openaiRouter = (await import("../routes/openai/index")).default;
@@ -238,7 +240,6 @@ before(async () => {
   app.use(cors(credentialedCorsOptions()));
   app.use(cookieParser());
   app.use(express.json({ limit: "1mb" }));
-  app.use(authMiddleware);
   app.use("/api", integrationRouter);
   app.use("/api", officeRouter);
   app.use("/api", openaiRouter);
@@ -371,17 +372,23 @@ describe("disposable PostgreSQL identity security", () => {
 
     const memberAResponse = await request(
       `/api/openai/conversations/${conversation.id}`,
-      { headers: { authorization: `Bearer ${memberA.sid}` } },
+      { headers: { cookie: `sid=${memberA.sid}` } },
     );
     assert.equal(memberAResponse.status, 200);
     const memberBResponse = await request(
       `/api/openai/conversations/${conversation.id}`,
-      { headers: { authorization: `Bearer ${memberB.sid}` } },
+      { headers: { cookie: `sid=${memberB.sid}` } },
     );
     assert.equal(memberBResponse.status, 404);
 
+    const bearerLocalSession = await request(
+      `/api/openai/conversations/${conversation.id}`,
+      { headers: { authorization: `Bearer ${memberA.sid}` } },
+    );
+    assert.equal(bearerLocalSession.status, 403);
+
     const office = await request("/api/offices/atlas/entry", {
-      headers: { authorization: `Bearer ${memberA.sid}` },
+      headers: { cookie: `sid=${memberA.sid}` },
     });
     assert.equal(office.status, 200);
 
@@ -411,7 +418,7 @@ describe("disposable PostgreSQL identity security", () => {
         eq(database.membershipsTable.subject, "member-a"),
       ));
     const removed = await request(`/api/openai/conversations/${conversation.id}`, {
-      headers: { authorization: `Bearer ${memberA.sid}` },
+      headers: { cookie: `sid=${memberA.sid}` },
     });
     assert.equal(removed.status, 403);
     assert.ok(await auth.getSession(memberA.sid));
@@ -424,7 +431,7 @@ describe("disposable PostgreSQL identity security", () => {
         eq(database.entitlementStateTable.code, "conversations:use"),
       ));
     const unentitled = await request(`/api/openai/conversations/${conversation.id}`, {
-      headers: { authorization: `Bearer ${memberA.sid}` },
+      headers: { cookie: `sid=${memberA.sid}` },
     });
     assert.equal(unentitled.status, 403);
 
@@ -437,9 +444,64 @@ describe("disposable PostgreSQL identity security", () => {
       sourceUpdatedAt: new Date(),
     });
     const revoked = await request(`/api/openai/conversations/${conversation.id}`, {
-      headers: { authorization: `Bearer ${memberA.sid}` },
+      headers: { cookie: `sid=${memberA.sid}` },
     });
     assert.equal(revoked.status, 403);
+  });
+
+  integrationTest("preserves the exact legacy issuer tuple for migrated Clerk users", async () => {
+    const userId = crypto.randomUUID();
+    const clerkIssuer = "https://clerk.accounts.test";
+    const clerkSubject = "user_clerk_native";
+    await database.db.insert(database.usersTable).values({ id: userId });
+    await database.db.insert(database.externalIdentitiesTable).values([
+      { issuer, subject: userId, userId },
+      { issuer: clerkIssuer, subject: clerkSubject, userId },
+    ]);
+    await database.db.insert(database.membershipsTable).values({
+      issuer,
+      subject: userId,
+      organization,
+      active: true,
+    });
+    await database.db.insert(database.entitlementStateTable).values({
+      issuer,
+      subject: userId,
+      code: "conversations:use",
+      active: true,
+      sequence: 1,
+      sourceUpdatedAt: new Date(),
+    });
+    await database.db.insert(database.revocationStateTable).values({
+      subject: `${issuer}|${userId}`,
+      sessionVersion: 1,
+      sequence: 1,
+      sourceUpdatedAt: new Date(),
+    });
+
+    const tuple = await clerkAuth.resolveClerkAuthorizationTuple(
+      userId,
+      clerkIssuer,
+      clerkSubject,
+    );
+    assert.deepEqual(tuple, { issuer, subject: userId });
+    const [entitlement] = await database.db.select()
+      .from(database.entitlementStateTable)
+      .where(and(
+        eq(database.entitlementStateTable.issuer, tuple.issuer),
+        eq(database.entitlementStateTable.subject, tuple.subject),
+        eq(database.entitlementStateTable.code, "conversations:use"),
+      ));
+    const [revocation] = await database.db.select()
+      .from(database.revocationStateTable)
+      .where(eq(database.revocationStateTable.subject, `${tuple.issuer}|${tuple.subject}`));
+    assert.equal(entitlement?.active, true);
+    assert.equal(revocation?.sessionVersion, 1);
+    const { isEffectivelyRevoked } = await import("./identityCore");
+    assert.equal(isEffectivelyRevoked(
+      { createdAt: 0, version: 1 },
+      { revokedBefore: null, sessionVersion: revocation?.sessionVersion ?? null },
+    ), true);
   });
 
   integrationTest("consumes signed entitlement and revocation events over HTTP", async () => {
@@ -528,7 +590,7 @@ describe("disposable PostgreSQL identity security", () => {
     });
     assert.equal(entitlement.status, 202);
     const denied = await request(`/api/openai/conversations/${conversation.id}`, {
-      headers: { authorization: `Bearer ${memberA.sid}` },
+      headers: { cookie: `sid=${memberA.sid}` },
     });
     assert.equal(denied.status, 403);
 
@@ -543,7 +605,7 @@ describe("disposable PostgreSQL identity security", () => {
     assert.ok(await auth.getSession(issuerBSid));
     const issuerBStillAuthorized = await request(
       `/api/openai/conversations/${conversation.id}`,
-      { headers: { authorization: `Bearer ${issuerBSid}` } },
+      { headers: { cookie: `sid=${issuerBSid}` } },
     );
     assert.equal(issuerBStillAuthorized.status, 200);
     const audits = await database.pool.query<{ detail: unknown; actor_hash: string | null }>(

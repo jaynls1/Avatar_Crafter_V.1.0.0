@@ -6,6 +6,7 @@ import {
   CAPABILITIES,
   isNamedServicePrincipal,
 } from "./routeAuthorization";
+import { resolveClerkIdentity } from "./clerkAuth";
 
 const requestId = (res: Response) => {
   const existing = res.getHeader("x-request-id");
@@ -31,7 +32,8 @@ export async function requireOfficeManager(
   res: Response,
   next: NextFunction,
 ) {
-  if (req.isAuthenticated?.() && canUseAdminPrivilege(req.user ?? null)) {
+  const identity = await resolveClerkIdentity(req);
+  if (identity && canUseAdminPrivilege(req.dbUser ?? null)) {
     next();
     return;
   }

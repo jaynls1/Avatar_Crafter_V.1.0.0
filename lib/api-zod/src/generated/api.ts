@@ -16,77 +16,6 @@ export const HealthCheckResponse = zod.object({
 });
 
 /**
- * @summary Get the currently authenticated user
- */
-export const GetCurrentAuthUserHeader = zod.object({
-  Authorization: zod
-    .string()
-    .optional()
-    .describe("Opaque session token — `Bearer <sid>`."),
-});
-
-export const GetCurrentAuthUserResponse = zod.object({
-  user: zod.union([
-    zod.object({
-      id: zod.string(),
-      email: zod.string().email().nullable(),
-      firstName: zod.string().nullable(),
-      lastName: zod.string().nullable(),
-      profileImageUrl: zod.string().nullable(),
-      isAdmin: zod.boolean().default(false),
-    }),
-    zod.null(),
-  ]),
-});
-
-/**
- * @summary Start the browser OIDC login flow
- */
-export const BeginBrowserLoginQueryParams = zod.object({
-  returnTo: zod.coerce
-    .string()
-    .optional()
-    .describe(
-      "Relative path to redirect to after login (must start with `\/`). Defaults to `\/`.",
-    ),
-});
-
-/**
- * @summary Complete the browser OIDC login flow
- */
-export const HandleBrowserLoginCallbackQueryParams = zod.object({
-  code: zod.coerce.string().optional(),
-  state: zod.coerce.string().optional(),
-  iss: zod.coerce.string().url().optional(),
-});
-
-/**
- * @summary Clear the session and begin OIDC logout
- */
-export const LogoutBrowserSessionHeader = zod.object({
-  Authorization: zod
-    .string()
-    .optional()
-    .describe("Opaque session token — `Bearer <sid>`."),
-});
-
-/**
- * @summary Exchange a mobile OIDC code for a session token
- */
-
-export const ExchangeMobileAuthorizationCodeBody = zod.object({
-  code: zod.string().min(1),
-  code_verifier: zod.string().min(1),
-  redirect_uri: zod.string().url().min(1),
-  state: zod.string().min(1),
-  nonce: zod.string().min(1).optional(),
-});
-
-export const ExchangeMobileAuthorizationCodeResponse = zod.object({
-  token: zod.string(),
-});
-
-/**
  * @summary List all conversations
  */
 export const ListOpenaiConversationsResponseItem = zod.object({
@@ -164,18 +93,4 @@ export const SendOpenaiMessageParams = zod.object({
 
 export const SendOpenaiMessageBody = zod.object({
   content: zod.string(),
-});
-
-/**
- * @summary Delete a mobile session token
- */
-export const LogoutMobileSessionHeader = zod.object({
-  Authorization: zod
-    .string()
-    .optional()
-    .describe("Opaque session token — `Bearer <sid>`."),
-});
-
-export const LogoutMobileSessionResponse = zod.object({
-  success: zod.boolean(),
 });

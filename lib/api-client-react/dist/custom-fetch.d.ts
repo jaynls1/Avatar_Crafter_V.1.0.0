@@ -1,5 +1,5 @@
 export type CustomFetchOptions = RequestInit & {
-    responseType?: "json" | "text" | "blob" | "auto";
+    responseType?: "json" | "text" | "blob" | "auto" | "response";
 };
 export type ErrorType<T = unknown> = ApiError<T>;
 export type BodyType<T> = T;

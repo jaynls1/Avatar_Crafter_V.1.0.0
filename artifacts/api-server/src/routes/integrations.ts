@@ -14,7 +14,7 @@ import {
 } from "@workspace/db";
 import { AssertionError, verifyIdentityAssertion } from "../lib/assertions";
 import { securityAudit } from "../lib/audit";
-import { createLocalSession } from "../lib/auth";
+import { createLocalSession, getSession } from "../lib/localSession";
 import { integrationSecurity } from "../middlewares/integrationSecurity";
 import {
   adapterEnabled, eventClaimsMatch, validateDestinationRegistry,
@@ -74,15 +74,22 @@ function failure(req: Request, res: Response, error: unknown) {
 
 router.use("/next", integrationSecurity);
 
-router.get("/next/csrf/v1", (req, res) => {
+router.get("/next/csrf/v1", async (req, res) => {
   const sid = req.cookies?.sid;
-  if (!sid || !req.isAuthenticated()) {
+  if (!sid) {
     res.status(401).json({
       error: { code: "authentication_required", requestId: requestId(res) },
     });
     return;
   }
   try {
+    const session = await getSession(sid);
+    if (!session) {
+      res.status(401).json({
+        error: { code: "authentication_required", requestId: requestId(res) },
+      });
+      return;
+    }
     issueCsrfCookie(res, sid);
     res.sendStatus(204);
   } catch {

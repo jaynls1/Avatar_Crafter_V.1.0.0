@@ -55,9 +55,9 @@ Every package extends `tsconfig.base.json` which sets `composite: true`. The roo
 Express 5 API server. Routes live in `src/routes/` and use `@workspace/api-zod` for request and response validation and `@workspace/db` for persistence.
 
 - Entry: `src/index.ts` — reads `PORT`, starts Express
-- App setup: `src/app.ts` — mounts CORS (credentials), cookie-parser, JSON/urlencoded parsing, authMiddleware, routes at `/api`
-- Routes: `src/routes/index.ts` mounts sub-routers; `src/routes/health.ts` exposes `GET /health`; `src/routes/auth.ts` exposes OIDC login/callback/logout and mobile token exchange
-- Auth: `src/lib/auth.ts` (session management, OIDC config), `src/middlewares/authMiddleware.ts` (loads user from session on every request)
+- App setup: `src/app.ts` — mounts the Clerk Frontend API proxy before body parsers, CORS (credentials), cookie-parser, Clerk request verification, and routes at `/api`
+- Routes: `src/routes/index.ts` mounts sub-routers; `src/routes/health.ts` exposes `GET /health`
+- Auth: Clerk validates browser sessions; `src/middlewares/clerkAuth.ts` performs ID-bridge JIT provisioning and exposes the authorization row as `req.dbUser`. Neutral `src/lib/localSession.ts` remains only for NEXT integration handoff sessions.
 - Depends on: `@workspace/db`, `@workspace/api-zod`
 - `pnpm --filter @workspace/api-server run dev` — run the dev server
 - `pnpm --filter @workspace/api-server run build` — production esbuild bundle (`dist/index.cjs`)
@@ -91,10 +91,6 @@ Generated Zod schemas from the OpenAPI spec (e.g. `HealthCheckResponse`). Used b
 ### `lib/api-client-react` (`@workspace/api-client-react`)
 
 Generated React Query hooks and fetch client from the OpenAPI spec (e.g. `useHealthCheck`, `healthCheck`).
-
-### `lib/replit-auth-web` (`@workspace/replit-auth-web`)
-
-Browser auth package for Replit Auth (OIDC). Exports `useAuth()` hook with `{ user, isAuthenticated, isLoading, login, logout }`. Used in `artifacts/avatar-world`. Do **not** use generated API client code for auth — always use this package.
 
 ### `scripts` (`@workspace/scripts`)
 

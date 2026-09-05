@@ -19,6 +19,7 @@ import {
   AUTHORIZATION_ORGANIZATION,
   CAPABILITIES,
 } from "../middlewares/routeAuthorization";
+import { requireAuth } from "../middlewares/clerkAuth";
 import { saveConversationToNotion, getAgentDbId } from "../lib/notion-memory";
 import {
   isClickUpConfigured,
@@ -28,6 +29,7 @@ import {
 } from "../lib/clickup-memory";
 
 const memoryRouter = Router();
+memoryRouter.use(requireAuth);
 memoryRouter.use(requireEntitlement(
   AUTHORIZATION_ORGANIZATION,
   CAPABILITIES.PRIVATE_MEMORY_READ,
@@ -146,7 +148,7 @@ memoryRouter.post("/admin/memory/sync/:agentId", async (req, res) => {
         createdAt: m.createdAt,
       })),
       conversationId: lastConv.id,
-      memberId: lastConv.userId ?? `admin:${req.user!.id}`,
+      memberId: lastConv.userId ?? `admin:${req.dbUser!.id}`,
     });
 
     if (!result.saved) {
@@ -252,7 +254,7 @@ memoryRouter.post("/admin/memory/import", async (req, res) => {
         messages: conv.messages,
         conversationId: 0,
         source: "ChatGPT Export",
-        memberId: String(req.user!.id),
+        memberId: String(req.dbUser!.id),
       });
 
       if (result.saved) {

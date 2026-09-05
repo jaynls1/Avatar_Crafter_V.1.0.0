@@ -4,9 +4,10 @@ import {
   db, entitlementStateTable, externalIdentitiesTable, membershipsTable,
   revocationStateTable,
 } from "@workspace/db";
-import { getSession, getSessionId } from "../lib/auth";
+import { getSession, getSessionId } from "../lib/localSession";
 import { securityAudit } from "../lib/audit";
 import { isEffectivelyRevoked } from "../lib/identityCore";
+import { resolveClerkIdentity } from "./clerkAuth";
 
 export type AuthorizationContext = {
   userId: string;
@@ -34,14 +35,24 @@ export async function resolveAuthorizationContext(
   entitlementCode: string,
   correlationId?: string,
 ): Promise<AuthorizationContext | null> {
-  const session = await getSession(getSessionId(req) ?? "");
-  if (!session) return null;
-  if (!session.identity_issuer || !session.identity_subject) return null;
+  const localSession = await getSession(getSessionId(req) ?? "");
+  const sessionIdentity = (
+    localSession?.identity_issuer && localSession.identity_subject
+      ? {
+          userId: localSession.user.id,
+          issuer: localSession.identity_issuer,
+          subject: localSession.identity_subject,
+          issuedAt: localSession.created_at ?? 0,
+          sessionVersion: localSession.session_version ?? 0,
+        }
+      : null
+  ) ?? await resolveClerkIdentity(req);
+  if (!sessionIdentity) return null;
   const [identity] = await db.select().from(externalIdentitiesTable)
     .where(and(
-      eq(externalIdentitiesTable.issuer, session.identity_issuer),
-      eq(externalIdentitiesTable.subject, session.identity_subject),
-      eq(externalIdentitiesTable.userId, session.user.id),
+      eq(externalIdentitiesTable.issuer, sessionIdentity.issuer),
+      eq(externalIdentitiesTable.subject, sessionIdentity.subject),
+      eq(externalIdentitiesTable.userId, sessionIdentity.userId),
     ));
   if (!identity) return null;
   const qualifiedSubject = `${identity.issuer}|${identity.subject}`;
@@ -58,7 +69,10 @@ export async function resolveAuthorizationContext(
     db.select().from(revocationStateTable).where(eq(revocationStateTable.subject, qualifiedSubject)),
   ]);
   const revoked = isEffectivelyRevoked(
-    { createdAt: session.created_at ?? 0, version: session.session_version ?? 0 },
+    {
+      createdAt: sessionIdentity.issuedAt,
+      version: sessionIdentity.sessionVersion,
+    },
     revocation ? {
       revokedBefore: revocation.revokedBefore ? Math.floor(revocation.revokedBefore.getTime() / 1000) : null,
       sessionVersion: revocation.sessionVersion,
@@ -69,7 +83,7 @@ export async function resolveAuthorizationContext(
     : !entitlement?.active ? "not_entitled"
     : revoked ? "revoked" : undefined;
   const context: AuthorizationContext = {
-    userId: session.user.id, issuer: identity.issuer, subject: identity.subject, qualifiedSubject,
+    userId: sessionIdentity.userId, issuer: identity.issuer, subject: identity.subject, qualifiedSubject,
     providerConnected: identity.providerConnected, providerVersion: identity.providerVersion,
     membershipVersion: membership?.version ?? 0, entitlementVersion: entitlement?.sequence ?? 0,
     allowed: !reason, reason,

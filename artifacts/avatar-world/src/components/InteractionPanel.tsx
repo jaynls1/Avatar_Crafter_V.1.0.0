@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { ApiError, customFetch } from "@workspace/api-client-react";
 import { Agent } from "../agents";
 import { trackEvent } from "../lib/analytics";
 
@@ -12,6 +13,9 @@ interface Message {
 interface InteractionPanelProps {
   agent: Agent | null;
   isSpeaking: boolean;
+  canUseProtectedFeatures: boolean;
+  onAccessDenied: () => void;
+  onRequestSignIn: () => void;
   onStartSpeaking: () => void;
   onStopSpeaking: () => void;
   onClose: () => void;
@@ -22,6 +26,9 @@ interface InteractionPanelProps {
 export function InteractionPanel({
   agent,
   onClose,
+  canUseProtectedFeatures,
+  onAccessDenied,
+  onRequestSignIn,
   onStartSpeaking,
   onStopSpeaking,
   activeSpecialtyFilter,
@@ -103,25 +110,28 @@ export function InteractionPanel({
   const currentAgentIdRef = useRef<string | null>(null);
 
   const createNewConversation = async (agentName: string, agentId: string): Promise<number | null> => {
+    if (!canUseProtectedFeatures) return null;
     try {
-      const r = await fetch("/api/openai/conversations", {
+      const conv = await customFetch<{ id?: number }>("/api/openai/conversations", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ title: `Chat with ${agentName}`, agentId }),
+        responseType: "json",
       });
-      if (!r.ok) {
-        trackEvent("conversation_create_failed", { error_kind: "http" });
-        return null;
-      }
-      const conv = await r.json();
       if (typeof conv?.id !== "number") {
         trackEvent("conversation_create_failed", { error_kind: "invalid_response" });
         return null;
       }
       trackEvent("conversation_created");
       return conv.id;
-    } catch {
-      trackEvent("conversation_create_failed", { error_kind: "network" });
+    } catch (error) {
+      if (error instanceof ApiError && (error.status === 401 || error.status === 403)) {
+        onAccessDenied();
+        return null;
+      }
+      trackEvent("conversation_create_failed", {
+        error_kind: error instanceof ApiError ? "http" : "network",
+      });
       return null;
     }
   };
@@ -189,7 +199,7 @@ export function InteractionPanel({
   }, [messages, agent, conversationId]);
 
   const sendMessage = async () => {
-    if (!input.trim() || !agent || !conversationId || isStreaming) return;
+    if (!canUseProtectedFeatures || !input.trim() || !agent || !conversationId || isStreaming) return;
 
     const text = input.trim();
     const messageCount = messages.filter((message) => !message.streaming).length + 2;
@@ -211,17 +221,14 @@ export function InteractionPanel({
     abortRef.current = ctrl;
 
     try {
-      const response = await fetch(`/api/openai/conversations/${conversationId}/messages`, {
+      const response = await customFetch<Response>(`/api/openai/conversations/${conversationId}/messages`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ content: text }),
         signal: ctrl.signal,
+        responseType: "response",
       });
 
-      if (!response.ok) {
-        trackEvent("conversation_send_failed", { error_kind: "http" });
-        throw new Error("Message request failed");
-      }
       if (!response.body) {
         trackEvent("conversation_send_failed", { error_kind: "no_response_body" });
         throw new Error("No response body");
@@ -272,9 +279,15 @@ export function InteractionPanel({
         message_length: text.length,
         message_count: messageCount,
       });
-    } catch (err: any) {
-      if (err.name !== "AbortError" && err.message !== "Message request failed" && err.message !== "No response body") {
-        trackEvent("conversation_send_failed", { error_kind: "network" });
+    } catch (error) {
+      const err = error instanceof Error ? error : new Error("Unknown request failure");
+      if (error instanceof ApiError && (error.status === 401 || error.status === 403)) {
+        onAccessDenied();
+      }
+      if (err.name !== "AbortError" && err.message !== "No response body") {
+        trackEvent("conversation_send_failed", {
+          error_kind: error instanceof ApiError ? "http" : "network",
+        });
       }
       setMessages((prev) => {
         const next = [...prev];
@@ -726,7 +739,7 @@ export function InteractionPanel({
           <button
             onClick={clearHistory}
             title="Start a new conversation"
-            disabled={isStreaming}
+            disabled={!canUseProtectedFeatures || isStreaming}
             style={{
               background: "rgba(255,255,255,0.06)",
               border: "1px solid rgba(255,255,255,0.12)",
@@ -734,12 +747,12 @@ export function InteractionPanel({
               padding: "3px 9px",
               color: "rgba(255,255,255,0.4)",
               fontSize: 11,
-              cursor: isStreaming ? "not-allowed" : "pointer",
+              cursor: !canUseProtectedFeatures || isStreaming ? "not-allowed" : "pointer",
               display: "flex",
               alignItems: "center",
               gap: 4,
               transition: "all 0.2s",
-              opacity: isStreaming ? 0.5 : 1,
+              opacity: !canUseProtectedFeatures || isStreaming ? 0.5 : 1,
             }}
           >
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -782,9 +795,31 @@ export function InteractionPanel({
 
       {/* Input */}
       <div style={{ padding: "16px", borderTop: `1px solid ${agent.color}30` }}>
+        {!canUseProtectedFeatures && (
+          <button
+            type="button"
+            data-testid="button-panel-sign-in"
+            onClick={onRequestSignIn}
+            style={{
+              width: "100%",
+              marginBottom: 10,
+              padding: "10px 14px",
+              borderRadius: 10,
+              border: "1px solid rgba(167,139,250,0.45)",
+              background: "rgba(167,139,250,0.12)",
+              color: "#C4B5FD",
+              fontSize: 12,
+              fontWeight: 700,
+              cursor: "pointer",
+            }}
+          >
+            Sign in to chat with {agent.name}
+          </button>
+        )}
         <div style={{ display: "flex", gap: 8 }}>
           <button
             onClick={startListening}
+            disabled={!canUseProtectedFeatures || isStreaming}
             style={{
               padding: "10px 14px",
               borderRadius: 12,
@@ -793,7 +828,7 @@ export function InteractionPanel({
                 : "rgba(255,255,255,0.06)",
               border: `1px solid ${listening ? "#10B981" : "rgba(255,255,255,0.15)"}`,
               color: listening ? "#10B981" : "#888",
-              cursor: "pointer",
+              cursor: canUseProtectedFeatures && !isStreaming ? "pointer" : "not-allowed",
               fontSize: 16,
               transition: "all 0.2s",
               flexShrink: 0,
@@ -807,7 +842,7 @@ export function InteractionPanel({
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && !isStreaming && sendMessage()}
             placeholder="Ask your agent anything..."
-            disabled={isStreaming}
+            disabled={!canUseProtectedFeatures || isStreaming}
             style={{
               flex: 1,
               padding: "10px 14px",
@@ -817,22 +852,22 @@ export function InteractionPanel({
               color: "white",
               fontSize: 14,
               outline: "none",
-              opacity: isStreaming ? 0.6 : 1,
+              opacity: !canUseProtectedFeatures || isStreaming ? 0.6 : 1,
             }}
           />
           <button
             onClick={sendMessage}
-            disabled={!input.trim() || isStreaming}
+            disabled={!canUseProtectedFeatures || !input.trim() || isStreaming}
             style={{
               padding: "10px 16px",
               borderRadius: 12,
               background:
-                input.trim() && !isStreaming
+                canUseProtectedFeatures && input.trim() && !isStreaming
                   ? `linear-gradient(135deg, ${agent.color}, ${agent.accentColor})`
                   : "rgba(255,255,255,0.05)",
               border: "none",
               color: "white",
-              cursor: input.trim() && !isStreaming ? "pointer" : "not-allowed",
+              cursor: canUseProtectedFeatures && input.trim() && !isStreaming ? "pointer" : "not-allowed",
               fontSize: 16,
               flexShrink: 0,
               transition: "all 0.2s",

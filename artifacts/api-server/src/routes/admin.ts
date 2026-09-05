@@ -16,10 +16,11 @@ import {
   AUTHORIZATION_ORGANIZATION,
   CAPABILITIES,
 } from "../middlewares/routeAuthorization";
+import { requireAuth } from "../middlewares/clerkAuth";
 
 const adminRouter = Router();
 
-adminRouter.use(adminMiddleware);
+adminRouter.use(requireAuth, adminMiddleware);
 const requireAgentTools = requireEntitlement(
   AUTHORIZATION_ORGANIZATION,
   CAPABILITIES.AGENT_TOOLS_OPERATE,
@@ -78,7 +79,7 @@ adminRouter.get("/admin/agents", requireAgentTools, async (req, res) => {
 
 adminRouter.get("/admin/conversations/:agentId", requireAgentTools, async (req, res) => {
   const agentId = String(req.params.agentId);
-  const userId = req.user!.id;
+  const userId = req.dbUser!.id;
 
   let [conv] = await db
     .select()
@@ -120,7 +121,7 @@ adminRouter.post(
   async (req, res) => {
     const agentId = String(req.params.agentId);
     const { content } = req.body;
-    const userId = req.user!.id;
+    const userId = req.dbUser!.id;
 
     if (!content) {
       res.status(400).json({ error: "content is required" });
@@ -207,7 +208,7 @@ adminRouter.post(
   res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
   res.end();
 
-  scheduleNotionSync(conv.id, agentId, conv.title, req.user!.id);
+  scheduleNotionSync(conv.id, agentId, conv.title, req.dbUser!.id);
   scheduleClickUpScan(agentId, fullResponse, conv.id);
   },
 );
@@ -219,7 +220,7 @@ adminRouter.post("/admin/broadcast", requireAgentTools, async (req, res) => {
     return;
   }
 
-  const userId = req.user!.id;
+  const userId = req.dbUser!.id;
 
   const results = await Promise.allSettled(
     AGENT_IDS.map(async (agentId) => {

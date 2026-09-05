@@ -1,4 +1,3 @@
-import * as client from "openid-client";
 import crypto from "crypto";
 import { type Request, type Response } from "express";
 import {
@@ -10,16 +9,22 @@ import {
   usersTable,
 } from "@workspace/db";
 import { and, eq, isNull, sql } from "drizzle-orm";
-import type { AuthUser } from "@workspace/api-zod";
-import { legacySessionCompatibility } from "./oidcBoundary";
 import { clearCsrfCookie } from "./csrf";
 
-export const ISSUER_URL = process.env.ISSUER_URL ?? "https://replit.com/oidc";
 export const SESSION_COOKIE = "sid";
 export const SESSION_TTL = 7 * 24 * 60 * 60 * 1000;
 
+export interface LocalSessionUser {
+  id: string;
+  email: string | null;
+  firstName: string | null;
+  lastName: string | null;
+  profileImageUrl: string | null;
+  isAdmin: boolean;
+}
+
 export interface SessionData {
-  user: AuthUser;
+  user: LocalSessionUser;
   access_token?: string;
   refresh_token?: string;
   expires_at?: number;
@@ -30,28 +35,10 @@ export interface SessionData {
   identity_subject?: string;
 }
 
-let oidcConfig: client.Configuration | null = null;
-
-export async function getOidcConfig(): Promise<client.Configuration> {
-  if (!oidcConfig) {
-    oidcConfig = await client.discovery(
-      new URL(ISSUER_URL),
-      process.env.REPL_ID!,
-    );
-  }
-  return oidcConfig;
-}
-
-export async function createSession(data: SessionData): Promise<string> {
-  return createLocalSession(data.user, {
-    accessToken: data.access_token,
-    refreshToken: data.refresh_token,
-    expiresAt: data.expires_at ? new Date(data.expires_at * 1000) : undefined,
-    provider: "replit",
-  }, undefined, {
-    issuer: data.identity_issuer ?? ISSUER_URL,
-    subject: data.identity_subject ?? data.user.id,
-  });
+export function legacySessionCompatibility(
+  env: Readonly<Record<string, string | undefined>> = process.env,
+) {
+  return env.REPLIT_LEGACY_SESSION_COMPAT === "true";
 }
 
 const hashSecret = (secret: string) =>
@@ -64,7 +51,7 @@ function parseLocalToken(token: string) {
 }
 
 export async function createLocalSession(
-  user: AuthUser,
+  user: LocalSessionUser,
   provider?: {
     provider: string;
     accessToken?: string;
@@ -266,9 +253,5 @@ export async function clearSession(
 }
 
 export function getSessionId(req: Request): string | undefined {
-  const authHeader = req.headers["authorization"];
-  if (authHeader?.startsWith("Bearer ")) {
-    return authHeader.slice(7);
-  }
   return req.cookies?.[SESSION_COOKIE];
 }

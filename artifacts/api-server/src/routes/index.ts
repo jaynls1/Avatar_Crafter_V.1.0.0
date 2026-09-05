@@ -1,6 +1,5 @@
 import { Router, type IRouter } from "express";
 import healthRouter from "./health";
-import authRouter from "./auth";
 import openaiRouter from "./openai/index";
 import agentsRouter from "./agents";
 import securityRouter from "./security";
@@ -15,7 +14,6 @@ import integrationsRouter from "./integrations";
 const router: IRouter = Router();
 
 router.use(healthRouter);
-router.use(authRouter);
 router.use(integrationsRouter);
 router.use(officesRouter);   // public — must come before adminRouter
 router.use(hqScreenRouter);  // public — before adminRouter

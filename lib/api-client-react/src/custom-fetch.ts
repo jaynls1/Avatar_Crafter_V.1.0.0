@@ -1,5 +1,5 @@
 export type CustomFetchOptions = RequestInit & {
-  responseType?: "json" | "text" | "blob" | "auto";
+  responseType?: "json" | "text" | "blob" | "auto" | "response";
 };
 
 export type ErrorType<T = unknown> = ApiError<T>;
@@ -304,6 +304,10 @@ export async function customFetch<T = unknown>(
   if (!response.ok) {
     const errorData = await parseErrorBody(response, method);
     throw new ApiError(response, errorData, requestInfo);
+  }
+
+  if (responseType === "response") {
+    return response as T;
   }
 
   return (await parseSuccessBody(response, responseType, requestInfo)) as T;

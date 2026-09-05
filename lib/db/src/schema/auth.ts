@@ -14,7 +14,7 @@ import {
   varchar,
 } from "drizzle-orm/pg-core";
 
-// (IMPORTANT) This table is mandatory for Replit Auth, don't drop it.
+// Retained for compatibility with legacy and integration-issued local sessions.
 export const sessionsTable = pgTable(
   "sessions",
   {
@@ -197,7 +197,7 @@ export const integrationRateLimitBucketsTable = pgTable(
   ],
 );
 
-// (IMPORTANT) This table is mandatory for Replit Auth, don't drop it.
+// Clerk owns authentication; this table remains the local authorization bridge.
 export const usersTable = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   email: varchar("email").unique(),

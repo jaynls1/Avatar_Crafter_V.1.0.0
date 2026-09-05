@@ -1,3 +1,4 @@
+import { customFetch } from "@workspace/api-client-react";
 export interface Agent {
   id: string;
   name: string;
@@ -270,9 +271,12 @@ interface ApiAgent {
 export async function fetchAgents(): Promise<Agent[]> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
-  let res: Response;
+  let data: ApiAgent[];
   try {
-    res = await fetch(AGENTS_API_URL, { signal: controller.signal });
+    data = await customFetch<ApiAgent[]>(AGENTS_API_URL, {
+      signal: controller.signal,
+      responseType: "json",
+    });
   } catch (err) {
     throw new Error(
       `Could not reach the local API server at ${AGENTS_API_URL}. Is the API server running?`,
@@ -280,9 +284,6 @@ export async function fetchAgents(): Promise<Agent[]> {
   } finally {
     clearTimeout(timer);
   }
-  if (!res.ok) throw new Error(`Failed to fetch agents: ${res.status} ${res.statusText}`);
-  const data: ApiAgent[] = await res.json();
-
   return data
   .filter((a) => !HIDDEN_FROM_WORLD.has(a.codeName.toLowerCase()))
   .map((a) => {
