@@ -3,6 +3,7 @@ import { Canvas, useFrame } from "@react-three/fiber";
 import { OrbitControls, Text } from "@react-three/drei";
 import { useLocation } from "wouter";
 import * as THREE from "three";
+import OfficeWallArt from "../../components/OfficeWallArt";
 
 const W = 12; const H = 4; const D = 12;
 
@@ -220,6 +221,7 @@ export default function RookOffice() {
     <div style={{ width: "100vw", height: "100vh", background: "#02040a" }}>
       <Canvas shadows camera={{ position: [0, 2.8, 5.5], fov: 60, near: 0.1, far: 80 }} gl={{ antialias: true, alpha: false }}>
         <Suspense fallback={null}>
+          <OfficeWallArt officeSlug="rook" />
           <ambientLight intensity={0.15} color="#0a2040" />
           <pointLight position={[0, H - 0.5, 0]} intensity={8} distance={12} color="#22d3ee" />
           <RookRoom />

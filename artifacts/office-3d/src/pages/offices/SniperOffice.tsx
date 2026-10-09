@@ -3,6 +3,7 @@ import { Canvas, useFrame } from "@react-three/fiber";
 import { OrbitControls, Text } from "@react-three/drei";
 import { useLocation } from "wouter";
 import * as THREE from "three";
+import OfficeWallArt from "../../components/OfficeWallArt";
 
 const W = 13; const H = 4.2; const D = 13;
 
@@ -182,6 +183,7 @@ export default function SniperOffice() {
     <div style={{ width: "100vw", height: "100vh", background: "#0e0a06" }}>
       <Canvas shadows camera={{ position: [0, 2.8, 6], fov: 60, near: 0.1, far: 80 }} gl={{ antialias: true, alpha: false }}>
         <Suspense fallback={null}>
+          <OfficeWallArt officeSlug="sniper" />
           <ambientLight intensity={0.3} color="#ffcc88" />
           <pointLight position={[0, H - 0.5, 0]} intensity={15} distance={14} color="#fff5e0" castShadow />
           <pointLight position={[-4, 2, -2]} intensity={8} distance={8} color="#f87171" />

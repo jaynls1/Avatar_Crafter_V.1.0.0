@@ -9,23 +9,9 @@ import type { CameraView } from "../hooks/useRoomEvents";
 import Room, { ROOM_DIMS } from "../components/Room";
 import Furniture from "../components/Furniture";
 import PhotoAgent from "../components/PhotoAgent";
-import WallPoster from "../components/WallPoster";
+import OfficeWallArt from "../components/OfficeWallArt";
 
 const { w, h, d } = ROOM_DIMS;
-
-function buildAtlasPosters(tools: ReturnType<typeof useStore>["tools"]) {
-  const posters: { tool: typeof tools[0]; position: [number, number, number]; rotation: [number, number, number] }[] = [];
-  const backWall = tools.slice(0, 5);
-  const spacing = (w - 2) / (backWall.length + 1);
-  backWall.forEach((tool, i) => {
-    posters.push({
-      tool,
-      position: [-(w / 2 - spacing * (i + 1) - 0.5), h / 2, -(d / 2) + 0.12],
-      rotation: [0, 0, 0],
-    });
-  });
-  return posters;
-}
 
 interface CamState {
   position: [number, number, number];
@@ -97,7 +83,7 @@ function HallwayBackDoor({ to, label }: { to: string; label: string }) {
 
 export default function AtlasOfficePage() {
   const [, navigate] = useLocation();
-  const { tools, loadRoomFromApi, roomSlug } = useStore();
+  const { loadRoomFromApi, roomSlug } = useStore();
   const [camView, setCamView] = useState<CameraView>("auto");
 
   useRoomEvents(roomSlug, (view) => setCamView(view));
@@ -108,7 +94,6 @@ export default function AtlasOfficePage() {
     loadRoomFromApi(slug);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const posters = buildAtlasPosters(tools);
 
   return (
     <div style={{ width: "100vw", height: "100vh", background: "#0a0f18" }}>
@@ -117,9 +102,7 @@ export default function AtlasOfficePage() {
         <Suspense fallback={null}>
           <Room />
           <Furniture />
-          {posters.map(({ tool, position, rotation }) => (
-            <WallPoster key={tool.id} tool={tool} position={position} rotation={rotation} />
-          ))}
+          <OfficeWallArt officeSlug="atlas" />
           <PhotoAgent position={[2.5, 0, -1]} />
           <HallwayBackDoor to="/" label="Main Office" />
           <CamRig view={camView} />

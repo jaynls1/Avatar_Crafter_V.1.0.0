@@ -3,6 +3,7 @@ import { Canvas, useFrame } from "@react-three/fiber";
 import { OrbitControls, Text } from "@react-three/drei";
 import { useLocation } from "wouter";
 import * as THREE from "three";
+import OfficeWallArt from "../../components/OfficeWallArt";
 
 const W = 13; const H = 4.5; const D = 13;
 
@@ -187,6 +188,7 @@ export default function ScribeOffice() {
     <div style={{ width: "100vw", height: "100vh", background: "#1a1004" }}>
       <Canvas shadows camera={{ position: [0, 2.8, 6], fov: 60, near: 0.1, far: 80 }} gl={{ antialias: true, alpha: false }}>
         <Suspense fallback={null}>
+          <OfficeWallArt officeSlug="scribe" />
           <ambientLight intensity={0.35} color="#ffc877" />
           <pointLight position={[0, H - 0.5, 0]} intensity={12} distance={14} color="#ffdd88" castShadow />
           <LibraryRoom />

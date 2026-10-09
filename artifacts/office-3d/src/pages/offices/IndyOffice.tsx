@@ -3,6 +3,7 @@ import { Canvas, useFrame } from "@react-three/fiber";
 import { OrbitControls, Text } from "@react-three/drei";
 import { useLocation } from "wouter";
 import * as THREE from "three";
+import OfficeWallArt from "../../components/OfficeWallArt";
 
 const W = 13; const H = 4.5; const D = 13;
 
@@ -136,6 +137,7 @@ export default function IndyOffice() {
     <div style={{ width: "100vw", height: "100vh", background: "#f0ece4" }}>
       <Canvas shadows camera={{ position: [0, 2.8, 6], fov: 60, near: 0.1, far: 80 }} gl={{ antialias: true, alpha: false }}>
         <Suspense fallback={null}>
+          <OfficeWallArt officeSlug="indy" />
           <ambientLight intensity={1.1} color="#fff8f0" />
           <directionalLight position={[3, 8, 4]} intensity={0.8} color="#ffffff" castShadow />
           <IndyRoom />

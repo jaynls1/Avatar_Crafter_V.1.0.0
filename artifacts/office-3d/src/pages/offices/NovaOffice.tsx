@@ -3,6 +3,7 @@ import { Canvas, useFrame } from "@react-three/fiber";
 import { OrbitControls, Text } from "@react-three/drei";
 import { useLocation } from "wouter";
 import * as THREE from "three";
+import OfficeWallArt from "../../components/OfficeWallArt";
 
 const W = 14; const H = 4.5; const D = 14;
 
@@ -223,6 +224,7 @@ export default function NovaOffice() {
     <div style={{ width: "100vw", height: "100vh", background: "#04080e" }}>
       <Canvas shadows camera={{ position: [0, 3, 6.5], fov: 62, near: 0.1, far: 80 }} gl={{ antialias: true, alpha: false }} style={{ background: "#04080e" }}>
         <Suspense fallback={null}>
+          <OfficeWallArt officeSlug="nova" />
           <ambientLight intensity={0.2} color="#1040a0" />
           <NovaRoom />
           <HologramPanel position={[-2.5, 2.0, -D / 2 + 0.25]} rotation={[0, 0, 0]} delay={0} />

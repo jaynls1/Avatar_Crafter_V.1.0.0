@@ -3,6 +3,7 @@ import { Canvas, useFrame } from "@react-three/fiber";
 import { OrbitControls, Text } from "@react-three/drei";
 import { useLocation } from "wouter";
 import * as THREE from "three";
+import OfficeWallArt from "../../components/OfficeWallArt";
 
 const W = 13; const H = 4.5; const D = 13;
 
@@ -189,6 +190,7 @@ export default function IggyOffice() {
     <div style={{ width: "100vw", height: "100vh", background: "#0e0a06" }}>
       <Canvas shadows camera={{ position: [0, 2.8, 6], fov: 62, near: 0.1, far: 80 }} gl={{ antialias: true, alpha: false }}>
         <Suspense fallback={null}>
+          <OfficeWallArt officeSlug="iggy" />
           <ambientLight intensity={0.55} color="#fff0e0" />
           <pointLight position={[0, H - 0.4, 0]} intensity={18} distance={16} color="#fff5e0" castShadow />
           <IggyRoom />
