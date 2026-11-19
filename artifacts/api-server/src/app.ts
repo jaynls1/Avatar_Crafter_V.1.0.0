@@ -1,6 +1,6 @@
 import express, { type Express } from "express";
 import cors from "cors";
-import { credentialedCorsOptions } from "./lib/corsPolicy";
+import { credentialedCorsOptions, allowedCorsOrigins } from "./lib/corsPolicy";
 import cookieParser from "cookie-parser";
 import { authMiddleware } from "./middlewares/authMiddleware";
 import router from "./routes";
@@ -14,6 +14,15 @@ app.use(cookieParser());
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
 app.use(authMiddleware);
+
+// Fail closed for cross-site cookie-authenticated mutations; do not alter
+// token-authenticated integrations that do not carry browser cookies.
+app.use((req, res, next) => {
+  if (!["POST", "PUT", "PATCH", "DELETE"].includes(req.method) || !req.isAuthenticated()) return next();
+  const origin = req.get("Origin");
+  if (!origin || !allowedCorsOrigins().has(origin)) return res.status(403).json({ error: "Unapproved request origin" });
+  next();
+});
 
 app.use("/api", router);
 
