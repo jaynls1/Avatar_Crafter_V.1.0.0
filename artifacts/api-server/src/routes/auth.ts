@@ -257,7 +257,7 @@ router.post(
       const sid = await createSession(sessionData);
       res.json(ExchangeMobileAuthorizationCodeResponse.parse({ token: sid }));
     } catch (err) {
-      req.log.error({ err }, "Mobile token exchange error");
+      console.error("Mobile token exchange error", err);
       res.status(500).json({ error: "Token exchange failed" });
     }
   },
