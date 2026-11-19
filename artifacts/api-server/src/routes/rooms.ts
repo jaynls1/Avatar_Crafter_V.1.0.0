@@ -2,6 +2,7 @@ import { Router, type Response, type IRouter } from "express";
 import { db, roomsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
+import { adminMiddleware } from "../middlewares/adminMiddleware";
 
 const router: IRouter = Router();
 
@@ -50,7 +51,7 @@ const DEFAULT_TOOLS = [
 ];
 
 // GET /api/rooms — list all rooms
-router.get("/rooms", async (_req, res) => {
+router.get("/rooms", adminMiddleware, async (_req, res) => {
   try {
     const rooms = await db.select().from(roomsTable).orderBy(roomsTable.createdAt);
     res.json({ rooms });
@@ -61,7 +62,7 @@ router.get("/rooms", async (_req, res) => {
 });
 
 // POST /api/rooms — create a room
-router.post("/rooms", async (req, res) => {
+router.post("/rooms", adminMiddleware, async (req, res) => {
   try {
     const body = z.object({
       slug: z.string().min(1).max(100),
@@ -91,7 +92,7 @@ router.post("/rooms", async (req, res) => {
 });
 
 // GET /api/rooms/:slug/events — SSE stream for live room updates
-router.get("/rooms/:slug/events", (req, res) => {
+router.get("/rooms/:slug/events", adminMiddleware, (req, res) => {
   const { slug } = req.params;
 
   res.setHeader("Content-Type", "text/event-stream");
@@ -119,7 +120,7 @@ router.get("/rooms/:slug/events", (req, res) => {
 });
 
 // GET /api/rooms/:slug — get a single room (auto-creates "default")
-router.get("/rooms/:slug", async (req, res) => {
+router.get("/rooms/:slug", adminMiddleware, async (req, res) => {
   try {
     const { slug } = req.params;
     const rooms = await db.select().from(roomsTable).where(eq(roomsTable.slug, slug));
@@ -144,7 +145,7 @@ router.get("/rooms/:slug", async (req, res) => {
 });
 
 // PUT /api/rooms/:slug — update room and push live update via SSE
-router.put("/rooms/:slug", async (req, res) => {
+router.put("/rooms/:slug", adminMiddleware, async (req, res) => {
   try {
     const { slug } = req.params;
     const body = z.object({
@@ -186,7 +187,7 @@ router.put("/rooms/:slug", async (req, res) => {
 const VALID_VIEWS = ["auto", "desk", "agent", "wall", "overhead", "wide"] as const;
 type CameraView = typeof VALID_VIEWS[number];
 
-router.post("/rooms/:slug/camera", (req, res) => {
+router.post("/rooms/:slug/camera", adminMiddleware, (req, res) => {
   const { slug } = req.params;
   const { view } = req.body as { view?: string };
 
@@ -201,7 +202,7 @@ router.post("/rooms/:slug/camera", (req, res) => {
 });
 
 // DELETE /api/rooms/:slug
-router.delete("/rooms/:slug", async (req, res) => {
+router.delete("/rooms/:slug", adminMiddleware, async (req, res) => {
   try {
     const { slug } = req.params;
     const rooms = await db.delete(roomsTable).where(eq(roomsTable.slug, slug)).returning();
