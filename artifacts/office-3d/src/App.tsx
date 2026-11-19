@@ -43,10 +43,12 @@ function ScreenEmbed({ url, onClick }: { url: string; onClick: () => void }) {
       {/* 900 × 336 px ≈ 14.2 × 5.3 world-unit aspect ratio */}
       <iframe
         src={url}
+        sandbox="allow-scripts allow-same-origin allow-presentation"
+        referrerPolicy="no-referrer"
         width={900}
         height={336}
         style={{ border: "none", borderRadius: 4, display: "block" }}
-        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+        allow="autoplay; encrypted-media; picture-in-picture"
         allowFullScreen
       />
       {/* Invisible click-pass-through layer so OrbitControls still captures drag */}
