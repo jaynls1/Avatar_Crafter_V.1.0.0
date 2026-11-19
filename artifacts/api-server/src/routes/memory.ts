@@ -12,7 +12,7 @@ import { Router } from "express";
 import { sql } from "drizzle-orm";
 import { db } from "@workspace/db";
 import { conversations, messages } from "@workspace/db/schema";
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { adminMiddleware } from "../middlewares/adminMiddleware";
 import { saveConversationToNotion, getAgentDbId } from "../lib/notion-memory";
 import {
