@@ -42,7 +42,7 @@ jobs:
       - name: Typecheck
         run: pnpm run typecheck
       - name: Security regression tests
-        run: pnpm --filter @workspace/api-server exec tsx --test src/lib/corsPolicy.test.ts
+        run: pnpm --filter @workspace/api-server exec tsx --test src/lib/corsPolicy.test.ts src/lib/memberMemoryOwnership.test.ts
       - name: Validate disposable PostgreSQL schema
         run: pnpm --filter @workspace/db exec drizzle-kit push --config ./drizzle.config.ts
       - name: Validate schema tables exist
