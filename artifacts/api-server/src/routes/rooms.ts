@@ -232,8 +232,10 @@ router.delete("/rooms/:slug", adminMiddleware, async (req, res) => {
     return;
   }
     const rooms = await db.delete(roomsTable).where(eq(roomsTable.slug, slug)).returning();
-    if (!rooms.length) res.status(404).json({ error: "Room not found" });
-        return;
+    if (!rooms.length) {
+      res.status(404).json({ error: "Room not found" });
+      return;
+    }
     // Notify any connected clients the room was deleted
     broadcast(slug, { type: "deleted", slug });
     res.json({ ok: true });
