@@ -192,7 +192,11 @@ router.post("/offices", requireAdminKey, async (req, res) => {
 router.patch("/offices/:slug", requireAdminKey, async (req, res) => {
   try {
     await bootstrap();
-    const { slug } = req.params;
+    const slug = req.params.slug;
+    if (typeof slug !== "string") {
+      res.status(400).json({ error: "Invalid office slug" });
+      return;
+    }
 
     const [existing] = await db
       .select()
@@ -247,7 +251,11 @@ router.patch("/offices/:slug", requireAdminKey, async (req, res) => {
 router.delete("/offices/:slug", requireAdminKey, async (req, res) => {
   try {
     await bootstrap();
-    const { slug } = req.params;
+    const slug = req.params.slug;
+    if (typeof slug !== "string") {
+      res.status(400).json({ error: "Invalid office slug" });
+      return;
+    }
 
     const [existing] = await db
       .select({ id: officesTable.id })
