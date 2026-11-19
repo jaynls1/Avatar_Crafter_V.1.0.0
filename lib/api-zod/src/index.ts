@@ -1,2 +1,3 @@
 export * from "./generated/api";
-export * from "./generated/types";
+export type { AuthUser, AuthUserEnvelope, CreateOpenaiConversationBody as CreateOpenaiConversationBodyType, SendOpenaiMessageBody as SendOpenaiMessageBodyType } from "./generated/types";
+export * as ApiTypes from "./generated/types";
