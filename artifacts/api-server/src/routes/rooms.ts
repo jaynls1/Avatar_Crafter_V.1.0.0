@@ -181,8 +181,10 @@ router.put("/rooms/:slug", adminMiddleware, async (req, res) => {
       .where(eq(roomsTable.slug, slug))
       .returning();
 
-    if (!rooms.length) res.status(404).json({ error: "Room not found" });
-        return;
+    if (!rooms.length) {
+      res.status(404).json({ error: "Room not found" });
+      return;
+    }
 
     // Push live update to all connected SSE clients for this room
     broadcast(slug, { type: "update", room: rooms[0] });
