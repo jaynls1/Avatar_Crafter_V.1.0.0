@@ -8,11 +8,6 @@ const router: IRouter = Router();
 // ---------------------------------------------------------------------------
 // Shared CORS headers — public, no auth required
 // ---------------------------------------------------------------------------
-const CORS_HEADERS = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, POST, PATCH, DELETE, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, x-admin-key",
-};
 
 // ---------------------------------------------------------------------------
 // Admin-key guard for mutation endpoints (POST / PATCH / DELETE).
@@ -23,7 +18,6 @@ import type { Request, Response, NextFunction } from "express";
 import { timingSafeEqual } from "node:crypto";
 
 function requireAdminKey(req: Request, res: Response, next: NextFunction) {
-  Object.entries(CORS_HEADERS).forEach(([k, v]) => res.setHeader(k, v));
   const expected = process.env.AVATAR_CRAFTER_ADMIN_KEY;
   if (!expected) {
     res.status(503).json({ error: "Admin key not configured on server" });
@@ -37,10 +31,6 @@ function requireAdminKey(req: Request, res: Response, next: NextFunction) {
     return;
   }
   next();
-}
-
-function setCors(res: ReturnType<typeof import("express").response.json>) {
-  Object.entries(CORS_HEADERS).forEach(([k, v]) => res.setHeader(k, v));
 }
 
 // ---------------------------------------------------------------------------
@@ -120,12 +110,8 @@ function toPublic(row: typeof officesTable.$inferSelect) {
 // ---------------------------------------------------------------------------
 // OPTIONS preflight
 // ---------------------------------------------------------------------------
-router.options("/offices", (_req, res) => {
-  Object.entries(CORS_HEADERS).forEach(([k, v]) => res.setHeader(k, v));
-  res.sendStatus(204);
-});
+router.options("/offices", (_req, res) => { res.sendStatus(204); });
 router.options("/offices/:slug", (_req, res) => {
-  Object.entries(CORS_HEADERS).forEach(([k, v]) => res.setHeader(k, v));
   res.sendStatus(204);
 });
 
@@ -133,7 +119,6 @@ router.options("/offices/:slug", (_req, res) => {
 // GET /api/offices — list all non-deleted offices
 // ---------------------------------------------------------------------------
 router.get("/offices", async (_req, res) => {
-  Object.entries(CORS_HEADERS).forEach(([k, v]) => res.setHeader(k, v));
   try {
     await bootstrap();
     const rows = await db
@@ -152,7 +137,6 @@ router.get("/offices", async (_req, res) => {
 // POST /api/offices — create a new office
 // ---------------------------------------------------------------------------
 router.post("/offices", requireAdminKey, async (req, res) => {
-  Object.entries(CORS_HEADERS).forEach(([k, v]) => res.setHeader(k, v));
   try {
     const { slug, name, description = "", url, wing = "A", accentColor = "#4a9eff" } = req.body ?? {};
 
@@ -206,7 +190,6 @@ router.post("/offices", requireAdminKey, async (req, res) => {
 // PATCH /api/offices/:slug — partial update
 // ---------------------------------------------------------------------------
 router.patch("/offices/:slug", requireAdminKey, async (req, res) => {
-  Object.entries(CORS_HEADERS).forEach(([k, v]) => res.setHeader(k, v));
   try {
     await bootstrap();
     const { slug } = req.params;
@@ -262,7 +245,6 @@ router.patch("/offices/:slug", requireAdminKey, async (req, res) => {
 // DELETE /api/offices/:slug — soft-delete
 // ---------------------------------------------------------------------------
 router.delete("/offices/:slug", requireAdminKey, async (req, res) => {
-  Object.entries(CORS_HEADERS).forEach(([k, v]) => res.setHeader(k, v));
   try {
     await bootstrap();
     const { slug } = req.params;
