@@ -45,7 +45,7 @@ router.get("/hq-screen", async (_req, res) => {
   try {
     await bootstrap();
     const rows = await db.execute(sql`SELECT screen_url FROM hq_settings WHERE id = 1`);
-    const row = (rows as any).rows?.[0] ?? rows?.[0];
+    const row = rows.rows[0];
     const stored = row?.screen_url;
     res.json({ screenUrl: typeof stored === "string" && approvedScreenUrl(stored) ? stored : null });
   } catch (err) {
@@ -64,7 +64,8 @@ router.patch("/hq-screen", adminMiddleware, async (req, res) => {
       return;
     }
     if (typeof screenUrl === "string" && !approvedScreenUrl(screenUrl)) {
-      return res.status(400).json({ error: "Screen URL is not approved" });
+      res.status(400).json({ error: "Screen URL is not approved" });
+      return;
     }
     await db.execute(
       sql`UPDATE hq_settings SET screen_url = ${screenUrl ?? null}, updated_at = NOW() WHERE id = 1`
