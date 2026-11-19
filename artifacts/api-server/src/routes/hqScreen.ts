@@ -1,6 +1,17 @@
 import { Router, type IRouter } from "express";
 import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
+import { adminMiddleware } from "../middlewares/adminMiddleware";
+
+function approvedScreenUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    if (url.protocol !== "https:" || url.username || url.password) return false;
+    const approved = (process.env.HQ_SCREEN_ALLOWED_ORIGINS ?? "").split(",").map(v => v.trim()).filter(Boolean);
+    return approved.includes(url.origin);
+  } catch { return false; }
+}
+
 
 const router: IRouter = Router();
 
@@ -50,7 +61,7 @@ router.get("/hq-screen", async (_req, res) => {
 });
 
 // PATCH /api/hq-screen → update screenUrl
-router.patch("/hq-screen", async (req, res) => {
+router.patch("/hq-screen", adminMiddleware, async (req, res) => {
   cors(res);
   try {
     await bootstrap();
@@ -58,6 +69,9 @@ router.patch("/hq-screen", async (req, res) => {
     if (screenUrl !== undefined && screenUrl !== null && typeof screenUrl !== "string") {
       res.status(400).json({ error: "screenUrl must be a string or null" });
       return;
+    }
+    if (typeof screenUrl === "string" && !approvedScreenUrl(screenUrl)) {
+      return res.status(400).json({ error: "Screen URL is not approved" });
     }
     await db.execute(
       sql`UPDATE hq_settings SET screen_url = ${screenUrl ?? null}, updated_at = NOW() WHERE id = 1`
