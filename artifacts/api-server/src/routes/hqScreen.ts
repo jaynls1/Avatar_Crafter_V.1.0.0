@@ -53,7 +53,8 @@ router.get("/hq-screen", async (_req, res) => {
     await bootstrap();
     const rows = await db.execute(sql`SELECT screen_url FROM hq_settings WHERE id = 1`);
     const row = (rows as any).rows?.[0] ?? rows?.[0];
-    res.json({ screenUrl: row?.screen_url ?? null });
+    const stored = row?.screen_url;
+    res.json({ screenUrl: typeof stored === "string" && approvedScreenUrl(stored) ? stored : null });
   } catch (err) {
     console.error("GET /api/hq-screen failed", err);
     res.status(500).json({ error: "Failed to fetch HQ screen config" });
