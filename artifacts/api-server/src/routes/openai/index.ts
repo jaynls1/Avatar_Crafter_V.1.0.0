@@ -53,7 +53,7 @@ openaiRouter.get("/openai/conversations/:id", async (req, res) => {
     .from(conversations)
     .where(eq(conversations.id, id));
 
-  if (!conversation || !canAccessConversation(req, conversation)) {
+  if (!conversation || !conversation.userId || !canAccessConversation(req, conversation)) {
     res.status(404).json({ error: "Conversation not found" });
     return;
   }
@@ -88,7 +88,7 @@ openaiRouter.post("/openai/conversations/:id/messages", async (req, res) => {
     .from(conversations)
     .where(eq(conversations.id, id));
 
-  if (!conversation || !canAccessConversation(req, conversation)) {
+  if (!conversation || !conversation.userId || !canAccessConversation(req, conversation)) {
     res.status(404).json({ error: "Conversation not found" });
     return;
   }
@@ -145,7 +145,7 @@ openaiRouter.post("/openai/conversations/:id/messages", async (req, res) => {
   res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
   res.end();
 
-  scheduleNotionSync(id, conversation.agentId, conversation.title, conversation.userId!);
+  scheduleNotionSync(id, conversation.agentId, conversation.title, conversation.userId);
   scheduleClickUpScan(conversation.agentId, fullResponse, id);
 });
 
