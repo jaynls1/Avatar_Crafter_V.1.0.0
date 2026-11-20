@@ -17,7 +17,7 @@ function requireMember(req: any, res: any): string | null {
 }
 
 function canAccessConversation(req: any, conversation: { userId: string | null }): boolean {
-  return !!req.user?.isAdmin || (!!conversation.userId && conversation.userId === String(req.user?.id));
+  return !!conversation.userId && conversation.userId === String(req.user?.id);
 }
 
 openaiRouter.post("/openai/conversations", async (req, res) => {
@@ -53,7 +53,7 @@ openaiRouter.get("/openai/conversations/:id", async (req, res) => {
     .from(conversations)
     .where(eq(conversations.id, id));
 
-  if (!conversation || !canAccessConversation(req, conversation)) {
+  if (!conversation || !conversation.userId || !canAccessConversation(req, conversation)) {
     res.status(404).json({ error: "Conversation not found" });
     return;
   }
@@ -88,7 +88,7 @@ openaiRouter.post("/openai/conversations/:id/messages", async (req, res) => {
     .from(conversations)
     .where(eq(conversations.id, id));
 
-  if (!conversation || !canAccessConversation(req, conversation)) {
+  if (!conversation || !conversation.userId || !canAccessConversation(req, conversation)) {
     res.status(404).json({ error: "Conversation not found" });
     return;
   }
@@ -105,7 +105,7 @@ openaiRouter.post("/openai/conversations/:id/messages", async (req, res) => {
     .where(eq(messages.conversationId, id))
     .orderBy(messages.createdAt);
 
-  const systemPrompt = await buildSystemPrompt(conversation.agentId, memberId, content);
+  const systemPrompt = await buildSystemPrompt(conversation.agentId, conversation.userId, content);
 
   const chatMessages = [
     { role: "system" as const, content: systemPrompt },
@@ -145,7 +145,7 @@ openaiRouter.post("/openai/conversations/:id/messages", async (req, res) => {
   res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
   res.end();
 
-  scheduleNotionSync(id, conversation.agentId, conversation.title, memberId);
+  scheduleNotionSync(id, conversation.agentId, conversation.title, conversation.userId);
   scheduleClickUpScan(conversation.agentId, fullResponse, id);
 });
 

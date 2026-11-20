@@ -52,8 +52,11 @@ router.get("/office-products/:officeSlug", async (req, res) => {
     if (!upstream.ok) return res.status(upstream.status === 404 ? 404 : 502).json({ error: "Office artwork is unavailable" });
     const payload = payloadSchema.safeParse(await upstream.json());
     if (!payload.success || payload.data.officeSlug !== slug.data) return res.status(502).json({ error: "Office artwork response was invalid" });
-    res.setHeader("Cache-Control", "private, max-age=30");
-    return res.json(payload.data);
+    // A valid login is not proof of membership or a paid entitlement.
+    // Until a verified entitlement authority is integrated, expose only public records.
+    const publicOnly = payload.data.framedWallArt.filter(item => item.accessLevel === "public");
+    res.setHeader("Cache-Control", "private, no-store");
+    return res.json({ ...payload.data, framedWallArt: publicOnly });
   } catch {
     return res.status(502).json({ error: "Office artwork is unavailable" });
   }

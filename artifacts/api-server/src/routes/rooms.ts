@@ -2,6 +2,7 @@ import { Router, type Response, type IRouter } from "express";
 import { db, roomsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
+import { adminMiddleware } from "../middlewares/adminMiddleware";
 
 const router: IRouter = Router();
 
@@ -50,7 +51,7 @@ const DEFAULT_TOOLS = [
 ];
 
 // GET /api/rooms — list all rooms
-router.get("/rooms", async (_req, res) => {
+router.get("/rooms", adminMiddleware, async (_req, res) => {
   try {
     const rooms = await db.select().from(roomsTable).orderBy(roomsTable.createdAt);
     res.json({ rooms });
@@ -61,7 +62,7 @@ router.get("/rooms", async (_req, res) => {
 });
 
 // POST /api/rooms — create a room
-router.post("/rooms", async (req, res) => {
+router.post("/rooms", adminMiddleware, async (req, res) => {
   try {
     const body = z.object({
       slug: z.string().min(1).max(100),
@@ -91,8 +92,12 @@ router.post("/rooms", async (req, res) => {
 });
 
 // GET /api/rooms/:slug/events — SSE stream for live room updates
-router.get("/rooms/:slug/events", (req, res) => {
-  const { slug } = req.params;
+router.get("/rooms/:slug/events", adminMiddleware, (req, res) => {
+  const slug = req.params.slug;
+  if (typeof slug !== "string") {
+    res.status(400).json({ error: "Invalid room slug" });
+    return;
+  }
 
   res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Cache-Control", "no-cache");
@@ -119,9 +124,13 @@ router.get("/rooms/:slug/events", (req, res) => {
 });
 
 // GET /api/rooms/:slug — get a single room (auto-creates "default")
-router.get("/rooms/:slug", async (req, res) => {
+router.get("/rooms/:slug", adminMiddleware, async (req, res) => {
   try {
-    const { slug } = req.params;
+    const slug = req.params.slug;
+  if (typeof slug !== "string") {
+    res.status(400).json({ error: "Invalid room slug" });
+    return;
+  }
     const rooms = await db.select().from(roomsTable).where(eq(roomsTable.slug, slug));
     if (!rooms.length) {
       if (slug === "default") {
@@ -132,9 +141,11 @@ router.get("/rooms/:slug", async (req, res) => {
           furnitureConfig: DEFAULT_FURNITURE,
           tools: DEFAULT_TOOLS,
         }).returning();
-        return res.json({ room });
+        res.json({ room });
+        return;
       }
-      return res.status(404).json({ error: "Room not found" });
+      res.status(404).json({ error: "Room not found" });
+        return;
     }
     res.json({ room: rooms[0] });
   } catch (err) {
@@ -144,9 +155,13 @@ router.get("/rooms/:slug", async (req, res) => {
 });
 
 // PUT /api/rooms/:slug — update room and push live update via SSE
-router.put("/rooms/:slug", async (req, res) => {
+router.put("/rooms/:slug", adminMiddleware, async (req, res) => {
   try {
-    const { slug } = req.params;
+    const slug = req.params.slug;
+  if (typeof slug !== "string") {
+    res.status(400).json({ error: "Invalid room slug" });
+    return;
+  }
     const body = z.object({
       name: z.string().min(1).max(200).optional(),
       agentConfig: z.record(z.unknown()).optional(),
@@ -166,7 +181,10 @@ router.put("/rooms/:slug", async (req, res) => {
       .where(eq(roomsTable.slug, slug))
       .returning();
 
-    if (!rooms.length) return res.status(404).json({ error: "Room not found" });
+    if (!rooms.length) {
+      res.status(404).json({ error: "Room not found" });
+      return;
+    }
 
     // Push live update to all connected SSE clients for this room
     broadcast(slug, { type: "update", room: rooms[0] });
@@ -186,14 +204,19 @@ router.put("/rooms/:slug", async (req, res) => {
 const VALID_VIEWS = ["auto", "desk", "agent", "wall", "overhead", "wide"] as const;
 type CameraView = typeof VALID_VIEWS[number];
 
-router.post("/rooms/:slug/camera", (req, res) => {
-  const { slug } = req.params;
+router.post("/rooms/:slug/camera", adminMiddleware, (req, res) => {
+  const slug = req.params.slug;
+  if (typeof slug !== "string") {
+    res.status(400).json({ error: "Invalid room slug" });
+    return;
+  }
   const { view } = req.body as { view?: string };
 
   if (!view || !(VALID_VIEWS as readonly string[]).includes(view)) {
-    return res.status(400).json({
+    res.status(400).json({
       error: `Invalid view. Must be one of: ${VALID_VIEWS.join(", ")}`,
     });
+    return;
   }
 
   broadcast(slug, { type: "camera", view: view as CameraView });
@@ -201,11 +224,18 @@ router.post("/rooms/:slug/camera", (req, res) => {
 });
 
 // DELETE /api/rooms/:slug
-router.delete("/rooms/:slug", async (req, res) => {
+router.delete("/rooms/:slug", adminMiddleware, async (req, res) => {
   try {
-    const { slug } = req.params;
+    const slug = req.params.slug;
+  if (typeof slug !== "string") {
+    res.status(400).json({ error: "Invalid room slug" });
+    return;
+  }
     const rooms = await db.delete(roomsTable).where(eq(roomsTable.slug, slug)).returning();
-    if (!rooms.length) return res.status(404).json({ error: "Room not found" });
+    if (!rooms.length) {
+      res.status(404).json({ error: "Room not found" });
+      return;
+    }
     // Notify any connected clients the room was deleted
     broadcast(slug, { type: "deleted", slug });
     res.json({ ok: true });

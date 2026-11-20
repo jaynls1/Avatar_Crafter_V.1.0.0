@@ -12,7 +12,7 @@ import { Router } from "express";
 import { sql } from "drizzle-orm";
 import { db } from "@workspace/db";
 import { conversations, messages } from "@workspace/db/schema";
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { adminMiddleware } from "../middlewares/adminMiddleware";
 import { saveConversationToNotion, getAgentDbId } from "../lib/notion-memory";
 import {
@@ -112,12 +112,17 @@ memoryRouter.post("/admin/memory/sync/:agentId", async (req, res) => {
   const [lastConv] = await db
     .select()
     .from(conversations)
-    .where(eq(conversations.agentId, agentId))
+    .where(and(eq(conversations.agentId, agentId), eq(conversations.userId, req.user!.id)))
     .orderBy(desc(conversations.createdAt))
     .limit(1);
 
   if (!lastConv) {
     res.json({ synced: false, reason: "No conversations found for this agent." });
+    return;
+  }
+
+  if (!lastConv.userId || lastConv.userId !== req.user!.id) {
+    res.status(403).json({ error: "Conversation ownership cannot be verified" });
     return;
   }
 
@@ -137,7 +142,7 @@ memoryRouter.post("/admin/memory/sync/:agentId", async (req, res) => {
         createdAt: m.createdAt,
       })),
       conversationId: lastConv.id,
-      memberId: lastConv.userId ?? `admin:${req.user!.id}`,
+      memberId: lastConv.userId,
     });
 
     if (!result.saved) {

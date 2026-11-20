@@ -1,0 +1,57 @@
+name: Headquarters security verification
+on:
+  pull_request:
+    paths:
+      - 'artifacts/**'
+      - 'lib/**'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+      - '.github/workflows/hq-security-verification.yml'
+  workflow_dispatch:
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: hq_test
+          POSTGRES_PASSWORD: hq_test
+          POSTGRES_DB: hq_security
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U hq_test -d hq_security"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://hq_test:hq_test@localhost:5432/hq_security
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: pnpm
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Typecheck
+        run: pnpm run typecheck
+      - name: Security regression tests
+        run: pnpm --filter @workspace/api-server exec tsx --test src/lib/corsPolicy.test.ts src/lib/memberMemoryOwnership.test.ts
+      - name: Validate disposable PostgreSQL schema
+        run: pnpm --filter @workspace/db exec drizzle-kit push --config ./drizzle.config.ts
+      - name: Validate schema tables exist
+        run: |
+          PGPASSWORD=hq_test psql -h localhost -U hq_test -d hq_security -tAc "SELECT count(*) FROM information_schema.tables WHERE table_schema='public'" | awk '{ if ($1 < 1) exit 1 }'
+      - name: Verify member isolation with PostgreSQL
+        run: pnpm --filter @workspace/api-server exec tsx --test src/lib/memberMemoryRuntime.test.ts
+      - name: Production build
+        env:
+          PORT: "8080"
+          BASE_PATH: /
+        run: pnpm run build

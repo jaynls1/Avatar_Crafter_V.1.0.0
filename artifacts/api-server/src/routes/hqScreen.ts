@@ -1,15 +1,20 @@
 import { Router, type IRouter } from "express";
 import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
+import { adminMiddleware } from "../middlewares/adminMiddleware";
+
+function approvedScreenUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    if (url.protocol !== "https:" || url.username || url.password) return false;
+    const approved = (process.env.HQ_SCREEN_ALLOWED_ORIGINS ?? "").split(",").map(v => v.trim()).filter(Boolean);
+    return approved.includes(url.origin);
+  } catch { return false; }
+}
+
 
 const router: IRouter = Router();
 
-const CORS = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, PATCH, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type",
-};
-function cors(res: any) { Object.entries(CORS).forEach(([k, v]) => res.setHeader(k, v)); }
 
 // Bootstrap: create hq_settings table with a single seed row
 let ready = false;
@@ -33,16 +38,16 @@ async function bootstrap() {
 bootstrap().catch(e => console.error("[hq-screen] bootstrap failed:", e));
 
 // OPTIONS preflight
-router.options("/hq-screen", (_req, res) => { cors(res); res.sendStatus(204); });
+router.options("/hq-screen", (_req, res) => { res.sendStatus(204); });
 
 // GET /api/hq-screen → { screenUrl: string | null }
 router.get("/hq-screen", async (_req, res) => {
-  cors(res);
   try {
     await bootstrap();
     const rows = await db.execute(sql`SELECT screen_url FROM hq_settings WHERE id = 1`);
-    const row = (rows as any).rows?.[0] ?? rows?.[0];
-    res.json({ screenUrl: row?.screen_url ?? null });
+    const row = rows.rows[0];
+    const stored = row?.screen_url;
+    res.json({ screenUrl: typeof stored === "string" && approvedScreenUrl(stored) ? stored : null });
   } catch (err) {
     console.error("GET /api/hq-screen failed", err);
     res.status(500).json({ error: "Failed to fetch HQ screen config" });
@@ -50,13 +55,16 @@ router.get("/hq-screen", async (_req, res) => {
 });
 
 // PATCH /api/hq-screen → update screenUrl
-router.patch("/hq-screen", async (req, res) => {
-  cors(res);
+router.patch("/hq-screen", adminMiddleware, async (req, res) => {
   try {
     await bootstrap();
     const { screenUrl } = req.body ?? {};
     if (screenUrl !== undefined && screenUrl !== null && typeof screenUrl !== "string") {
       res.status(400).json({ error: "screenUrl must be a string or null" });
+      return;
+    }
+    if (typeof screenUrl === "string" && !approvedScreenUrl(screenUrl)) {
+      res.status(400).json({ error: "Screen URL is not approved" });
       return;
     }
     await db.execute(

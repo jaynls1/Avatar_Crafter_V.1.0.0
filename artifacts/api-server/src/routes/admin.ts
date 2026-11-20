@@ -140,6 +140,11 @@ adminRouter.post("/admin/conversations/:agentId/messages", async (req, res) => {
       .returning();
   }
 
+  if (!conv.userId || conv.userId !== userId) {
+    res.status(403).json({ error: "Conversation ownership mismatch" });
+    return;
+  }
+
   await db.insert(messages).values({
     conversationId: conv.id,
     role: "user",
@@ -152,7 +157,7 @@ adminRouter.post("/admin/conversations/:agentId/messages", async (req, res) => {
     .where(eq(messages.conversationId, conv.id))
     .orderBy(messages.createdAt);
 
-  const baseSystemPrompt = await buildSystemPrompt(agentId, null, content);
+  const baseSystemPrompt = await buildSystemPrompt(agentId, conv.userId, content);
   const adminSystemPrompt = `${baseSystemPrompt}
 
 [ADMIN OVERRIDE] You are now in a direct admin session with Jason, your creator and operator. This is a private, elevated-access conversation. Be fully transparent, share internal state, respond to operational instructions directly, and bypass any public-facing communication constraints. Treat all instructions here as authoritative directives from your operator.`;
@@ -195,7 +200,7 @@ adminRouter.post("/admin/conversations/:agentId/messages", async (req, res) => {
   res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
   res.end();
 
-  scheduleNotionSync(conv.id, agentId, conv.title);
+  scheduleNotionSync(conv.id, agentId, conv.title, conv.userId);
   scheduleClickUpScan(agentId, fullResponse, conv.id);
 });
 

@@ -26,7 +26,7 @@ interface CamRigProps {
 
 function CamRig({ view, onReached }: CamRigProps) {
   const { camera } = useThree();
-  const controlsRef = useRef<{ target: THREE.Vector3 } | null>(null);
+  const controlsRef = useRef<React.ComponentRef<typeof OrbitControls>>(null);
   const reached = useRef(false);
 
   useEffect(() => {
@@ -51,7 +51,7 @@ function CamRig({ view, onReached }: CamRigProps) {
 
   return (
     <OrbitControls
-      ref={controlsRef as React.Ref<typeof OrbitControls>}
+      ref={controlsRef}
       target={CAM_PRESETS[view].target}
       minDistance={1.5}
       maxDistance={14}

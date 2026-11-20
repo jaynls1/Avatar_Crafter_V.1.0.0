@@ -1,6 +1,16 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 
-const STEPS = [
+interface WalkthroughStep {
+  title: string;
+  emoji: string;
+  description: string;
+  tip: string;
+  action: string;
+  demo?: { icon: string; label: string; action: string }[];
+  roadmap?: { icon: string; label: string; desc: string }[];
+}
+
+const STEPS: WalkthroughStep[] = [
   {
     title: "Welcome to Your Agent World",
     emoji: "🌐",
@@ -170,7 +180,7 @@ export function Walkthrough({ onComplete }: WalkthroughProps) {
         </p>
 
         {/* Demo grid */}
-        {"demo" in current && current.demo && (
+        {current.demo && (
           <div
             style={{
               display: "grid",
@@ -202,28 +212,8 @@ export function Walkthrough({ onComplete }: WalkthroughProps) {
           </div>
         )}
 
-        {/* Code block */}
-        {"code" in current && current.code && (
-          <pre
-            style={{
-              background: "rgba(0,0,0,0.5)",
-              border: "1px solid rgba(249,115,22,0.2)",
-              borderRadius: 10,
-              padding: "14px 16px",
-              fontSize: 11,
-              color: "#FB923C",
-              overflowX: "auto",
-              marginBottom: 16,
-              lineHeight: 1.6,
-              whiteSpace: "pre-wrap",
-            }}
-          >
-            {current.code}
-          </pre>
-        )}
-
         {/* Roadmap */}
-        {"roadmap" in current && current.roadmap && (
+        {current.roadmap && (
           <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 16 }}>
             {current.roadmap.map((item, i) => (
               <div

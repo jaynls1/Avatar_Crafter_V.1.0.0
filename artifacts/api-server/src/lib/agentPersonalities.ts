@@ -17,7 +17,12 @@ export async function getAgentPersonalities(): Promise<Record<string, string>> {
   if (cachedPersonalities && Date.now() - cacheTimestamp < CACHE_TTL_MS) return cachedPersonalities;
   try {
     const res = await fetch(`${BACK_OFFICE_URL}/api/agents`);
-    const agents = await res.json();
+    const agents: unknown = await res.json();
+    if (!Array.isArray(agents) || !agents.every((agent: unknown) =>
+      typeof agent === "object" && agent !== null &&
+      "codeName" in agent && typeof agent.codeName === "string" &&
+      "systemPrompt" in agent && typeof agent.systemPrompt === "string"
+    )) throw new Error("Invalid agent personality response");
     cachedPersonalities = {};
     cacheTimestamp = Date.now();
     for (const agent of agents) {

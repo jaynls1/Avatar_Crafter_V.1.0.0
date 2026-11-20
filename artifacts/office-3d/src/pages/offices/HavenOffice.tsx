@@ -6,6 +6,11 @@ import * as THREE from "three";
 import OfficeWallArt from "../../components/OfficeWallArt";
 
 const W = 13; const H = 4.2; const D = 13;
+const WALLS = [
+  { x: 0, z: -D / 2, rotation: 0 },
+  { x: -W / 2, z: 0, rotation: Math.PI / 2 },
+  { x: W / 2, z: 0, rotation: -Math.PI / 2 },
+];
 
 function HavenRoom() {
   return (
@@ -18,8 +23,8 @@ function HavenRoom() {
         <planeGeometry args={[W, D]} />
         <meshStandardMaterial color="#d8d0c4" roughness={0.9} />
       </mesh>
-      {[[-D / 2, [0, 0]], [0, [Math.PI / 2, -(W / 2)]], [0, [-Math.PI / 2, W / 2]]].map(([z, [ry, x]], i) => (
-        <mesh key={i} rotation={[0, ry as number, 0]} position={[(x as number) || 0, H / 2, (z as number) || 0]}>
+      {WALLS.map(({ x, z, rotation }, i) => (
+        <mesh key={i} rotation={[0, rotation, 0]} position={[x, H / 2, z]}>
           <planeGeometry args={[i === 0 ? W : D, H]} />
           <meshStandardMaterial color={i === 0 ? "#e8e0d4" : "#ddd5c8"} roughness={0.88} />
         </mesh>
