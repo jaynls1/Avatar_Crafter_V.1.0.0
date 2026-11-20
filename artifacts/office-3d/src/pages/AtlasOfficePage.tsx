@@ -28,7 +28,7 @@ const CAM_VIEWS: Record<CameraView, CamState> = {
 };
 
 function CamRig({ view }: { view: CameraView }) {
-  const controlsRef = useRef<{ target: THREE.Vector3 } | null>(null);
+  const controlsRef = useRef<React.ComponentRef<typeof OrbitControls>>(null);
   const cameraRef = useRef<THREE.Camera | null>(null);
 
   useFrame(({ camera }) => {
@@ -43,7 +43,7 @@ function CamRig({ view }: { view: CameraView }) {
 
   return (
     <OrbitControls
-      ref={controlsRef as React.Ref<typeof OrbitControls>}
+      ref={controlsRef}
       target={CAM_VIEWS[view].target}
       minDistance={2}
       maxDistance={12}

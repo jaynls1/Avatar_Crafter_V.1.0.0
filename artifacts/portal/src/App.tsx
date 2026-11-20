@@ -868,6 +868,26 @@ function OpeningAnimation({ onComplete }: { onComplete: () => void }) {
   );
 }
 
+interface BrowserSpeechRecognition {
+  lang: string;
+  interimResults: boolean;
+  continuous: boolean;
+  onstart: () => void;
+  onresult: (event: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void;
+  onend: () => void;
+  onerror: () => void;
+  start(): void;
+  stop(): void;
+}
+
+function getSpeechRecognition() {
+  const speechWindow = window as Window & {
+    SpeechRecognition?: new () => BrowserSpeechRecognition;
+    webkitSpeechRecognition?: new () => BrowserSpeechRecognition;
+  };
+  return speechWindow.SpeechRecognition ?? speechWindow.webkitSpeechRecognition;
+}
+
 function NovaGreeting({ onEnterLobby }: { onEnterLobby: () => void }) {
   const [lines, setLines] = useState<boolean[]>([false, false, false, false]);
   const [messages, setMessages] = useState<Array<{ from: "nova" | "user"; text: string; streaming?: boolean }>>([]);
@@ -877,13 +897,13 @@ function NovaGreeting({ onEnterLobby }: { onEnterLobby: () => void }) {
   const [gestureSet, setGestureSet] = useState<GestureSet>("calm");
   const [convId, setConvId] = useState<number | null>(null);
   const [isListening, setIsListening] = useState(false);
-  const [voiceSupported] = useState(() => !!(window.SpeechRecognition || (window as any).webkitSpeechRecognition));
-  const recognitionRef = useRef<any>(null);
+  const [voiceSupported] = useState(() => Boolean(getSpeechRecognition()));
+  const recognitionRef = useRef<BrowserSpeechRecognition | null>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
 
   const startVoice = () => {
-    const SR = window.SpeechRecognition || (window as any).webkitSpeechRecognition;
+    const SR = getSpeechRecognition();
     if (!SR) return;
     if (isListening) {
       recognitionRef.current?.stop();
@@ -896,9 +916,9 @@ function NovaGreeting({ onEnterLobby }: { onEnterLobby: () => void }) {
     rec.interimResults = true;
     rec.continuous = false;
     rec.onstart = () => setIsListening(true);
-    rec.onresult = (e: any) => {
-      const transcript = Array.from(e.results as any[])
-        .map((r: any) => r[0].transcript)
+    rec.onresult = (event) => {
+      const transcript = Array.from(event.results)
+        .map((result) => result[0].transcript)
         .join("");
       setInput(transcript);
     };

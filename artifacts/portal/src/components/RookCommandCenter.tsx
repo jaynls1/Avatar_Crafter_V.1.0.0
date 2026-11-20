@@ -1,8 +1,5 @@
 import { useState, useEffect, useRef } from "react";
 
-// Rook portrait asset not present in this environment — using a styled
-// placeholder below instead of a missing image import.
-
 const R   = "#dc2626";
 const RL  = "#ef4444";
 const RR  = (a: number) => `rgba(220,38,38,${a})`;
@@ -184,7 +181,7 @@ export default function RookCommandCenter({ onBack }: { onBack: () => void }) {
             borderRadius: 6, overflow: "hidden",
           }}>
             <img
-              src={rookImg} alt="Rook"
+              src={`${import.meta.env.BASE_URL}about/agents/rook.png`} alt="Rook"
               style={{
                 width: "100%", display: "block",
                 filter: "saturate(0.6) contrast(1.1) brightness(0.88)",

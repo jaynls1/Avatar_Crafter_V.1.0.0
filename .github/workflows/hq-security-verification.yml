@@ -48,5 +48,10 @@ jobs:
       - name: Validate schema tables exist
         run: |
           PGPASSWORD=hq_test psql -h localhost -U hq_test -d hq_security -tAc "SELECT count(*) FROM information_schema.tables WHERE table_schema='public'" | awk '{ if ($1 < 1) exit 1 }'
+      - name: Verify member isolation with PostgreSQL
+        run: pnpm --filter @workspace/api-server exec tsx --test src/lib/memberMemoryRuntime.test.ts
       - name: Production build
+        env:
+          PORT: "8080"
+          BASE_PATH: /
         run: pnpm run build

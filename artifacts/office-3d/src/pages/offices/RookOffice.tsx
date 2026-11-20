@@ -67,12 +67,7 @@ function RookRoom() {
 function SecurityEventLog({ position, rotation }: { position: [number, number, number]; rotation: [number, number, number] }) {
   const visibleLines = 10;
   const textRefs = useRef<(THREE.Mesh | null)[]>([]);
-  const linesRef = useRef<string[]>(() => EVENT_POOL.slice(0, visibleLines) as unknown as string[]);
   const timer = useRef(0);
-
-  if (!linesRef.current.length) {
-    linesRef.current = EVENT_POOL.slice(0, visibleLines);
-  }
 
   const [displayLines, setDisplayLines] = useState<string[]>(() => EVENT_POOL.slice(0, visibleLines));
 
