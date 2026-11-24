@@ -55,7 +55,7 @@ const SYNTHETIC_OFFICE_PRODUCTS = {
     {
       id: "00000000-0000-4000-8000-000000000003",
       type: "framed-product-art",
-      mediaUrl: "data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg"></svg>",
+      mediaUrl: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg"></svg>',
       accessibleName: "[SYNTHETIC] Invalid media",
       shortDescription: "[SYNTHETIC] Must be rejected because the media URL is not HTTPS.",
       destinationUrl: "https://synthetic.next.test/destinations/invalid-media",
